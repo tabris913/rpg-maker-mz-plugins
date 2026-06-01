@@ -1,7 +1,13 @@
+//=============================================================================
+// RPG Maker MZ - T_ElementRankSystem
+//=============================================================================
+
 /*:
  * @target MZ
  * @plugindesc 【自由拡張版】スキルで戦闘中に属性耐性レベルを動的に上下させるプラグイン
- * @author RPGMZ
+ * @author tosshie
+ * @base PluginCommonBase
+ * @orderAfter PluginCommonBase
  *
  * @param ResistRanks
  * @text 耐性の追加段階（無効～通常の間）

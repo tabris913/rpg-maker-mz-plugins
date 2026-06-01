@@ -1,17 +1,17 @@
 //=============================================================================
-// RPG Maker MZ - T_EnemyLevelSystem
+// RPG Maker MZ - 
 //=============================================================================
 
 "use strict";
 
 /*:
  * @target MZ
- * @plugindesc 敵キャラにレベルシステムを導入するプラグイン
+ * @plugindesc
  * @author tosshie
  * @base PluginCommonBase
  * @orderAfter PluginCommonBase
  * 
- * @param 
+ * @param
  *   @text
  *   @desc
  *   @type
