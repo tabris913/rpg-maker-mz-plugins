@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+  },
+  "include": [
+    "src/*.js",
+    "src/plugins/*.js",
+    "lunalite-pixi-mz.d.ts",
+  ]
+}

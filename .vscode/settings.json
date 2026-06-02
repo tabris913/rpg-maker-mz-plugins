@@ -1,5 +1,10 @@
 {
     "editor.rulers": [
         35, 73
-    ]
+    ],
+    "editor.unicodeHighlight.ambiguousCharacters": false,
+    "[javascript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "prettier.printWidth": 120
 }
