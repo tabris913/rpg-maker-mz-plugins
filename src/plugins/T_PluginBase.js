@@ -29,6 +29,12 @@
  * PluginParamParser.number("hello")    --> undefined
  * PluginParamParser.number("hello", 1) --> 1
  *
+ * PluginParamParser.string("")                 --> ""
+ * PluginParamParser.string("hello")            --> "hello"
+ * PluginParamParser.string(0)                  --> "0"
+ * PluginParamParser.string(undefined)          --> undefined
+ * PluginParamParser.string(undefined, "hello") --> "hello"
+ *
  * ================
  * Version History
  * ================
@@ -40,12 +46,18 @@
 
 (() => {
   const PluginParamParser = {
+    /**
+     *
+     * @param {unknown} value
+     * @param {boolean | undefined} defaultValue
+     * @returns {boolean | undefined}
+     */
     boolean: (value, defaultValue = undefined) => {
       if (defaultValue !== undefined && typeof defaultValue !== "boolean") {
         throw new Error("Default value must be a boolean value or undefined.");
       }
 
-      if (value === undefined || value === "") {
+      if (value === undefined || value === null || value === "") {
         return defaultValue;
       }
       if (typeof value === "boolean") {
@@ -68,13 +80,14 @@
      *
      * @param {unknown} value
      * @param {number | undefined} defaultValue
+     * @returns {number | undefined}
      */
     number: (value, defaultValue = undefined) => {
       if (defaultValue !== undefined && typeof defaultValue !== "number") {
         throw new Error("Default value must be a number or undefined.");
       }
 
-      if (value === undefined || value === "") {
+      if (value === undefined || value === null || value === "") {
         return defaultValue;
       }
       if (typeof value === "number") {
@@ -90,6 +103,23 @@
       }
 
       return defaultValue;
+    },
+    /**
+     *
+     * @param {unknown} value
+     * @param {string | undefined} defaultValue
+     * @returns {string | undefined}
+     */
+    string: (value, defaultValue = undefined) => {
+      if (defaultValue !== undefined && typeof defaultValue === "string") {
+        throw new Error("Default value must be a string or undefined.");
+      }
+
+      if (value === undefined || value === null) return defaultValue;
+
+      if (typeof value === "string") return value;
+
+      return String(value);
     },
   };
 })();

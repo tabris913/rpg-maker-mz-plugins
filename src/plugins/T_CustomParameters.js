@@ -1356,14 +1356,14 @@ const setCustomParams = () => {
   // --------------------------------------------------------------------------
   /**
    *
-   * @param {import('./T_CustomParameters').Cparam} param
+   * @param {import('./T_CustomParameters').Cparam} cparam
    * @see Game_BattlerBase.prototype.customParamBase
    */
-  Game_Enemy.prototype.customParamBase = function (param) {
+  Game_Enemy.prototype.customParamBase = function (cparam) {
     // レベルアップ対応は別プラグイン化
     let value = 0;
-    if (this.enemy().meta && this.enemy().meta[`add_${param.key}`] !== undefined) {
-      value += Number(this.enemy().meta[`add_${param.key}`]);
+    if (this.enemy().meta && this.enemy().meta[`add_${cparam.key}`] !== undefined) {
+      value += Number(this.enemy().meta[`add_${cparam.key}`]) || 0;
     }
 
     return value;
@@ -1371,15 +1371,15 @@ const setCustomParams = () => {
 
   /**
    *
-   * @param {import('./T_CustomParameters').Cparam} param
+   * @param {import('./T_CustomParameters').Cparam} cparam
    * @see Game_BattlerBase.prototype.customParamPlus
    */
-  Game_Enemy.prototype.customParamPlus = function (param) {
-    let value = Game_Battler.prototype.customParamPlus.call(this, param);
+  Game_Enemy.prototype.customParamPlus = function (cparam) {
+    let value = Game_Battler.prototype.customParamPlus.call(this, cparam);
     // 加算のみ
     for (const state of this.states()) {
-      if (state && state.meta[`add_${param.key}`] !== undefined) {
-        value += Number(state.meta[`add_${param.key}`]);
+      if (state && state.meta[`add_${cparam.key}`] !== undefined) {
+        value += Number(state.meta[`add_${cparam.key}`]) || 0;
       }
     }
 
@@ -1388,14 +1388,14 @@ const setCustomParams = () => {
 
   /**
    *
-   * @param {import('./T_CustomParameters').Cparam} param
+   * @param {import('./T_CustomParameters').Cparam} cparam
    * @see Game_BattlerBase.prototype.customParamRate
    */
-  Game_Enemy.prototype.customParamRate = function (param) {
+  Game_Enemy.prototype.customParamRate = function (cparam) {
     let value = 1;
     for (const state of this.states()) {
-      if (state && state.meta[`prod_${param.key}`] !== undefined) {
-        value *= Number(state.meta[`prod_${param.key}`]);
+      if (state && state.meta[`prod_${cparam.key}`] !== undefined) {
+        value *= Number(state.meta[`prod_${cparam.key}`]) || 1;
       }
     }
 

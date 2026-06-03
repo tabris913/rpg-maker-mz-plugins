@@ -11,11 +11,13 @@
  * @base T_PluginBase
  * @orderAfter T_PluginBase
  *
- * @param
- *   @text
+ * @param ShowLevelInBattle
+ *   @text バトル画面に敵キャラのレベルを表示する
  *   @desc
- *   @type
- *   @default
+ *   @type boolean
+ *   @on 表示する
+ *   @off 表示しない
+ *   @default false
  *
  * @help
  * ================================
@@ -35,6 +37,13 @@
 
 "use strict";
 
+/**
+ * Global variable
+ *
+ * @type {import('./T_EnemyLevelSystem').GlobalV}
+ */
+const TELS = {};
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------------------------------------------------
@@ -48,7 +57,13 @@
  * @param {HTMLOrSVGScriptElement | null} script
  */
 const readParams = (script) => {
+  /**
+   * @type {import('./T_EnemyLevelSystem').RawParams}
+   */
   const params = PluginManagerEx.createParameter(script);
+  console.debug(params);
+
+  TELS.showLevelInBattle = PluginParamParser.boolean(params.ShowLevelInBattle, false);
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -89,6 +104,10 @@ const readParams = (script) => {
     this._classId = this.setupClassId();
   };
 
+  Game_Enemy.prototype.currentClass = function () {
+    return Game_Actor.prototype.currentClass.call(this);
+  };
+
   /**
    *
    * @returns {number}
@@ -105,29 +124,81 @@ const readParams = (script) => {
    * @returns {number}
    */
   Game_Enemy.prototype.getCurrentLevel = function () {
-    if ($dataMap && $dataMap.meta) {
-      let defaultLevel = 1;
+    let level = 1,
+      minLevel = 1,
+      maxLevel = 99;
 
+    // マップから設定を読み込む
+    if ($dataMap && $dataMap.meta) {
       const levelSync = $dataMap.meta.levelSync;
       if (levelSync) {
         switch (typeof levelSync) {
           case "boolean":
-            defaultLevel = $gameParty.highestLevel() || 1;
+            if (levelSync === true) {
+              level = $gameParty.highestLevel() || 1;
+            }
+            break;
           case "string":
-            defaultLevel ||= Number(levelSync);
+            level ||= Number(levelSync);
         }
       }
       const enemyLevelBonus = this.enemy().meta?.levelBonus;
       if (enemyLevelBonus) {
-        defaultLevel += Number(enemyLevelBonus) || 0;
+        level += Number(enemyLevelBonus) || 0;
       }
       const level = $dataMap.meta[`enemy_${this._enemyId}`];
 
-      const minLevel = Number($dataMap.meta.minLevel) || 1;
-      const maxLevel = Number($dataMap.meta.maxLevel) || 99;
+      minLevel ||= Number($dataMap.meta.minLevel);
+      maxLevel ||= Number($dataMap.meta.maxLevel);
 
-      return (Number(level) || defaultLevel).clamp(minLevel, maxLevel);
+      level ||= Number(level);
     }
+
+    return level.clamp(minLevel, maxLevel);
+  };
+
+  _Game_Enemy_paramBase = Game_Enemy.prototype.paramBase;
+  /**
+   *
+   * @param {number} paramId
+   * @returns
+   */
+  Game_Enemy.prototype.paramBase = function (paramId) {
+    if (this._classId !== undefined) {
+      // クラス指定あり
+      const classData = $dataClasses[this._classId];
+      if (classData && classData.params) {
+        return classData.params[paramId][this._level];
+      }
+    }
+
+    return _Game_Enemy_paramBase.apply(this, arguments);
+  };
+
+  _Game_Enemy_customParamBase = Game_Enemy.prototype.customParamBase;
+  /**
+   * T_CustomParameters.js を利用しているときのみ呼び出される
+   *
+   * @param {import('./T_CustomParameters').Cparam} cparam
+   * @returns {number}
+   */
+  Game_Enemy.prototype.customParamBase = function (cparam) {
+    if (this._classId !== undefined) {
+      // クラス指定あり
+      return Game_Actor.prototype.customParamBase.call(this, cparam);
+    }
+
+    return _Game_Enemy_customParamBase.apply(this, arguments);
+  };
+
+  _Game_Enemy_name = Game_Enemy.prototype.name;
+  Game_Enemy.prototype.name = function () {
+    const name = _Game_Enemy_name.call(this);
+    if (TELS.showLevelInBattle) {
+      return `${name} Lv.${this._level}`;
+    }
+
+    return name;
   };
 
   // -------------------------------------------------------------------------------------------------------------------

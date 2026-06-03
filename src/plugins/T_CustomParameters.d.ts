@@ -2,19 +2,19 @@ export type BuiltInParam1Input = Partial<{
   /**
    * 最大のバフ段階
    */
-  maxBuff: number;
+  maxBuff: number | string;
   /**
    * 最大のデバフ段階
    */
-  maxDebuff: number;
+  maxDebuff: number | string;
   /**
    * 表示/非表示
    */
-  visible: boolean;
+  visible: boolean | string;
   /**
    * 表示順
    */
-  displayOrder: number;
+  displayOrder: number | string;
 }>;
 export type BuiltInParam2Input = BuiltInParam1Input & {
   /**
