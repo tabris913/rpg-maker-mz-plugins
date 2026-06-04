@@ -12,17 +12,62 @@
  * @orderAfter T_PluginBase
  *
  * @param ShowLevelInBattle
- *   @text バトル画面に敵キャラのレベルを表示する
- *   @desc
+ *   @text 敵キャラレベル表示
+ *   @desc バトル画面に敵キャラのレベルを表示する
  *   @type boolean
  *   @on 表示する
  *   @off 表示しない
  *   @default false
  *
  * @help
- * ================================
+ * ==================================
  * T_EnemyLevelSystem.js [ja] v0.0.1
- * ================================
+ * ==================================
+ *
+ * # Dependencies
+ *
+ * - PluginCommonBase.js
+ * 　> {RPG Maker MZ のインストール場所}/dlc/BasicResources/plugins/official
+ * 　> にあるものを，ゲームプロジェクトのプラグインディレクトリにコピーし，
+ * 　> プラグイン管理から有効化してください
+ * - T_PluginBase.js
+ * 　> ゲームプロジェクトのプラグインディレクトリにコピーし，プラグイン管理から
+ * 　> 有効化してください
+ *
+ * # できること
+ *
+ * - 敵キャラにレベルシステムを導入し，レベルに応じて能力値を変化させる
+ * - 敵キャラのレベルによって使えるスキルも変化させる
+ * - 敵キャラの名前にレベルを付与して表示する
+ *
+ * # 設定方法
+ * ## プラグイン設定
+ * ### 敵キャラレベル表示
+ * バトル画面で敵キャラの名前の後ろにレベル表記を表記するかを切り替えます．
+ *
+ * ## データベース
+ * データベースのメモ欄に1行ずつタグを記述することで，さまざまな設定が可能です．
+ * 本プラグインでは，敵キャラおよびマップのメモ欄を解析します．
+ *
+ * ### 職業
+ * 敵キャラに適用する職業を作成してください．アクターの職業を敵キャラに流用する
+ * ことも可能で，特別な手順・設定はありません．
+ *
+ * ### 敵キャラ
+ * 職業をメモに設定します．
+ *
+ * <classId: {value}>
+ * 　職業のIDを設定します．
+ * 　e.g. <classId: 1>
+ * 　     --> (独自に変更してなければ) 職業は「剣士」
+ *
+ * ### マップ
+ *
+ * <levelSync>
+ * <levelSync: {value}>
+ * <enemy_{enemyId}: {value}>
+ * <minLevel: {value}>
+ * <maxLevel: {value}>
  *
  * ================
  * Version History
@@ -150,6 +195,9 @@ const readParams = (script) => {
 
       minLevel ||= Number($dataMap.meta.minLevel);
       maxLevel ||= Number($dataMap.meta.maxLevel);
+      // TODO [min, max]でランダム
+      // 個別指定が勝つ
+      // スキル
 
       level ||= Number(level);
     }
