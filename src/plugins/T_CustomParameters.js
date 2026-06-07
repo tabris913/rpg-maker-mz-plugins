@@ -570,10 +570,19 @@ const TCP = {};
 const parseNormalParam = (definition, _default) => ({
   key: _default.key,
   maxBuff: PluginParamParser.number(definition.maxBuff, _default.maxBuff ?? 2),
-  maxDebuff: PluginParamParser.number(definition.maxDebuff, _default.maxDebuff ?? 2),
+  maxDebuff: PluginParamParser.number(
+    definition.maxDebuff,
+    _default.maxDebuff ?? 2,
+  ),
   isRate: false,
-  visible: PluginParamParser.boolean(definition.visible, _default.visible ?? false),
-  displayOrder: PluginParamParser.number(definition.displayOrder, _default.displayOrder),
+  visible: PluginParamParser.boolean(
+    definition.visible,
+    _default.visible ?? false,
+  ),
+  displayOrder: PluginParamParser.number(
+    definition.displayOrder,
+    _default.displayOrder,
+  ),
   paramId: _default.paramId,
   nameId: _default.nameId,
   type: "param",
@@ -588,10 +597,19 @@ const parseXSParam = (definition, _default) => ({
   key: _default.key,
   name: definition.name || _default.name,
   maxBuff: PluginParamParser.number(definition.maxBuff, _default.maxBuff ?? 0),
-  maxDebuff: PluginParamParser.number(definition.maxDebuff, _default.maxDebuff ?? 0),
+  maxDebuff: PluginParamParser.number(
+    definition.maxDebuff,
+    _default.maxDebuff ?? 0,
+  ),
   isRate: true,
-  visible: PluginParamParser.boolean(definition.visible, _default.visible ?? false),
-  displayOrder: PluginParamParser.number(definition.displayOrder, _default.displayOrder),
+  visible: PluginParamParser.boolean(
+    definition.visible,
+    _default.visible ?? false,
+  ),
+  displayOrder: PluginParamParser.number(
+    definition.displayOrder,
+    _default.displayOrder,
+  ),
   paramId: _default.paramId,
   nameId: _default.nameId,
   type: _default.type,
@@ -602,7 +620,7 @@ const parseXSParam = (definition, _default) => ({
  *
  * @param {HTMLOrSVGScriptElement | null} script
  */
-const readParams = (script) => {
+TCP.readParams = (script) => {
   /**
    * @type {import('./T_CustomParameters').RawParams}
    */
@@ -656,10 +674,28 @@ const readParams = (script) => {
       paramId: 5,
       nameId: 5,
     }),
-    agility: parseNormalParam(params.Agility, { key: "agi", visible: true, displayOrder: 4, paramId: 6, nameId: 6 }),
-    luck: parseNormalParam(params.Luck, { key: "luk", visible: true, displayOrder: 5, paramId: 7, nameId: 7 }),
+    agility: parseNormalParam(params.Agility, {
+      key: "agi",
+      visible: true,
+      displayOrder: 4,
+      paramId: 6,
+      nameId: 6,
+    }),
+    luck: parseNormalParam(params.Luck, {
+      key: "luk",
+      visible: true,
+      displayOrder: 5,
+      paramId: 7,
+      nameId: 7,
+    }),
     // 追加能力値
-    hitRate: parseXSParam(params.HitRate, { key: "hit", displayOrder: 6, paramId: 0, nameId: 8, type: "xparam" }),
+    hitRate: parseXSParam(params.HitRate, {
+      key: "hit",
+      displayOrder: 6,
+      paramId: 0,
+      nameId: 8,
+      type: "xparam",
+    }),
     evasionRate: parseXSParam(params.EvasionRate, {
       key: "eva",
       displayOrder: 7,
@@ -853,7 +889,9 @@ const readParams = (script) => {
     builtInParams.experienceRate,
   ].concat(additionalParams);
 
-  TCP.paramsDef = paramsDef.sort((a, b) => (a.displayOrder ?? 100) - (b.displayOrder ?? 100));
+  TCP.paramsDef = paramsDef.sort(
+    (a, b) => (a.displayOrder ?? 100) - (b.displayOrder ?? 100),
+  );
   TCP.buffRate = params.buffRate ?? 0.25;
   TCP.paramMemo = {};
   TCP.presentValues = { HP: params.HitPoints, MP: params.MagicPoints };
@@ -879,7 +917,7 @@ const setCustomParams = () => {
 
   let isDatabaseLoaded = false;
   let customParamForClasses = {};
-  _DataManager_isDatabaseLoaded = DataManager.isDatabaseLoaded;
+  const _DataManager_isDatabaseLoaded = DataManager.isDatabaseLoaded;
   DataManager.isDatabaseLoaded = function () {
     if (!_DataManager_isDatabaseLoaded.call(this)) return false;
     if (!isDatabaseLoaded) {
@@ -892,15 +930,18 @@ const setCustomParams = () => {
               if (key.startsWith(`${cparam.key}_`)) {
                 switch (key) {
                   case `${cparam.key}_growCurve`:
-                    customParamForClasses[cls.id][cparam.key].growCurve = value.split(",").map(Number);
+                    customParamForClasses[cls.id][cparam.key].growCurve = value
+                      .split(",")
+                      .map(Number);
                     break;
                   case `${cparam.key}_mode`:
                     customParamForClasses[cls.id][cparam.key].mode = value;
                     break;
                   case `${cparam.key}_maxLevel`:
                   default:
-                    const tagName = classMetaKey.relace(`${cparam.key}_`, "");
-                    customParamForClasses[cls.id][cparam.key][tagName] = Number(value);
+                    const tagName = key.replace(`${cparam.key}_`, "");
+                    customParamForClasses[cls.id][cparam.key][tagName] =
+                      Number(value);
                 }
               }
             }
@@ -908,6 +949,7 @@ const setCustomParams = () => {
         }
       }
       console.debug(customParamForClasses);
+      TCP.customParamForClasses = customParamForClasses;
       isDatabaseLoaded = true;
     }
     return true;
@@ -919,9 +961,14 @@ const setCustomParams = () => {
 // ---------------------------------------------------------------------------------------------------------------------
 (() => {
   const script = document.currentScript;
-  readParams(script);
+  TCP.readParams(script);
 
   setCustomParams();
+
+  /**
+   * @type Array<import('./T_CustomParameters').Cparam>
+   */
+  const customParameters = TCP.paramsDef.filter((p) => p.type === "cparam");
 
   // -------------------------------------------------------------------------------------------------------------------
   // Objects
@@ -969,7 +1016,7 @@ const setCustomParams = () => {
   // --------------------------------------------------------------------------
   // Game_ActionResult
   // --------------------------------------------------------------------------
-  _Game_ActionResult_clear = Game_ActionResult.prototype.clear;
+  const _Game_ActionResult_clear = Game_ActionResult.prototype.clear;
   Game_ActionResult.prototype.clear = function () {
     _Game_ActionResult_clear.apply(this, arguments);
     this.addedCustomBuffs = [];
@@ -977,7 +1024,8 @@ const setCustomParams = () => {
     this.removedCustomBuffs = [];
   };
 
-  _Game_ActionResult_isStatusAffected = Game_ActionResult.prototype.isStatusAffected;
+  const _Game_ActionResult_isStatusAffected =
+    Game_ActionResult.prototype.isStatusAffected;
   Game_ActionResult.prototype.isStatusAffected = function () {
     return (
       _Game_ActionResult_isStatusAffected.apply(this, arguments) ||
@@ -1020,13 +1068,14 @@ const setCustomParams = () => {
   // --------------------------------------------------------------------------
   // Game_BattlerBase
   // --------------------------------------------------------------------------
-  _Game_BattlerBase_clearParamPlus = Game_BattlerBase.prototype.clearParamPlus;
+  const _Game_BattlerBase_clearParamPlus =
+    Game_BattlerBase.prototype.clearParamPlus;
   Game_BattlerBase.prototype.clearParamPlus = function () {
     _Game_BattlerBase_clearParamPlus.apply(this, arguments);
     this._customParamPlus = Array(customParameters.length).fill(0);
   };
 
-  _Game_BattlerBase_clearBuffs = Game_BattlerBase.prototype.clearBuffs;
+  const _Game_BattlerBase_clearBuffs = Game_BattlerBase.prototype.clearBuffs;
   Game_BattlerBase.prototype.clearBuffs = function () {
     _Game_BattlerBase_clearBuffs.apply(this, arguments);
     this._customBuffs = Array(customParameters.length).fill(0);
@@ -1054,7 +1103,9 @@ const setCustomParams = () => {
     return this._customBuffs[cparamId] < 0;
   };
 
-  Game_BattlerBase.prototype.isCustomBuffOrDebuffAffected = function (cparamId) {
+  Game_BattlerBase.prototype.isCustomBuffOrDebuffAffected = function (
+    cparamId,
+  ) {
     return this._customBuffs[cparamId] !== 0;
   };
 
@@ -1078,7 +1129,10 @@ const setCustomParams = () => {
     }
   };
 
-  Game_BattlerBase.prototype.overwriteCustomBuffTurns = function (cparamId, turns) {
+  Game_BattlerBase.prototype.overwriteCustomBuffTurns = function (
+    cparamId,
+    turns,
+  ) {
     if (this._customBuffTurns[cparamId] < turns) {
       this._customBuffTurns[cparamId] = turns;
     }
@@ -1088,7 +1142,8 @@ const setCustomParams = () => {
     return this._customBuffTurns[cparamId] === 0;
   };
 
-  _Game_BattlerBase_updateBuffTurns = Game_BattlerBase.prototype.updateBuffTurns;
+  const _Game_BattlerBase_updateBuffTurns =
+    Game_BattlerBase.prototype.updateBuffTurns;
   Game_BattlerBase.prototype.updateBuffTurns = function () {
     _Game_BattlerBase_updateBuffTurns.apply(this, arguments);
     for (let i = 0; i < this._customBuffTurns.length; i++) {
@@ -1123,7 +1178,10 @@ const setCustomParams = () => {
    * @returns
    */
   Game_BattlerBase.prototype.customParamBasePlus = function (param) {
-    return Math.max(param.min, this.customParamBase(param) + this.customParamPlus(param));
+    return Math.max(
+      param.min,
+      this.customParamBase(param) + this.customParamPlus(param),
+    );
   };
 
   /**
@@ -1156,7 +1214,10 @@ const setCustomParams = () => {
       throw new Error("指定されたIDの独自能力値が見つかりませんでした");
     }
 
-    const value = this.customParamBasePlus(param) * this.customParamRate(cparamId) * this.customParamBuffRate(cparamId);
+    const value =
+      this.customParamBasePlus(param) *
+      this.customParamRate(cparamId) *
+      this.customParamBuffRate(cparamId);
     const clampedValue = value.clamp(param.min ?? 0, param.max ?? Infinity);
     return param.isRate ? clampedValue : Math.round(clampedValue);
   };
@@ -1199,7 +1260,7 @@ const setCustomParams = () => {
     }
   };
 
-  _Game_Battler_removeAllBuffs = Game_Battler.prototype.removeAllBuffs;
+  const _Game_Battler_removeAllBuffs = Game_Battler.prototype.removeAllBuffs;
   Game_Battler.prototype.removeAllBuffs = function () {
     _Game_Battler_removeAllBuffs.apply(this, arguments);
     for (let i = 0; i < this.customBuffLength(); i++) {
@@ -1207,7 +1268,7 @@ const setCustomParams = () => {
     }
   };
 
-  _Game_Battler_removeBuffsAuto = Game_Battler.prototype.removeBuffsAuto;
+  const _Game_Battler_removeBuffsAuto = Game_Battler.prototype.removeBuffsAuto;
   Game_Battler.prototype.removeBuffsAuto = function () {
     _Game_Battler_removeBuffsAuto.apply(this, arguments);
     for (let i = 0; i < this.customBuffLength(); i++) {
@@ -1220,10 +1281,12 @@ const setCustomParams = () => {
   // --------------------------------------------------------------------------
   // Game_Actor
   // --------------------------------------------------------------------------
-  _Game_Actor_paramRate = Game_Actor.prototype.paramRate;
+  const _Game_Actor_paramRate = Game_Actor.prototype.paramRate;
   Game_Actor.prototype.paramRate = function (paramId) {
     let value = _Game_Actor_paramRate.call(this, paramId);
-    const param = TCP.paramsDef.find((p) => p.type === "param" && p.paramId === paramId);
+    const param = TCP.paramsDef.find(
+      (p) => p.type === "param" && p.paramId === paramId,
+    );
     if (param) {
       for (const item of this.equips() || []) {
         if (item && item.meta[`prod_${param.key}`] !== undefined) {
@@ -1244,8 +1307,10 @@ const setCustomParams = () => {
      * @type number
      */
     const currentClassId = this.currentClass().id;
-    if (TCP.paramMemo[currentClassId]?.[cparam.key]?.[this._level] !== undefined) {
-      return TCP.paramMemo[currentClassId][cparam.key][this._level];
+    if (
+      TCP.paramMemo[currentClassId]?.[cparam.key]?.[this.level] !== undefined
+    ) {
+      return TCP.paramMemo[currentClassId][cparam.key][this.level];
     }
 
     let currentValue = 0;
@@ -1268,38 +1333,53 @@ const setCustomParams = () => {
         }
         break;
       case "grow":
-        const configs = customParamForClasses[currentClassId][cparam.key];
-        const levelConfig = configs[`lv${this._level}`];
+        const configs = TCP.customParamForClasses[currentClassId][cparam.key];
+        const levelConfig = configs[`lv${this.level}`];
         if (typeof levelConfig === "number" && !Number.isNaN(levelConfig)) {
-          currentValue = configs[`lv${this._level}`];
+          currentValue = configs[`lv${this.level}`];
         } else {
           const growCurveConfig = configs.growCurve;
-          if (!Array.isArray(growCurveConfig) || growCurveConfig.some((c) => typeof c !== "number")) {
-            throw new Error(`${cparam.name}の計算/取得ができません (レベル ${this._level})`);
+          if (
+            !Array.isArray(growCurveConfig) ||
+            growCurveConfig.some((c) => typeof c !== "number")
+          ) {
+            throw new Error(
+              `${cparam.name}の計算/取得ができません (レベル ${this.level})`,
+            );
           }
 
           const [start, end, grow] = growCurveConfig;
 
           const maxLevel = configs.maxLevel ?? this.maxLevel();
-          if (this._level >= maxLevel) {
+          if (this.level >= maxLevel) {
             currentValue = end;
           } else {
             const VALUE_DIFF = end - start;
-            const PREV_LEVEL = this._level - 1;
+            const PREV_LEVEL = this.level - 1;
             const SEMI_MAX_LEVEL = maxLevel - 1;
 
             if (configs.mode?.trim() === "drastic") {
               currentValue =
                 grow < 0
-                  ? end - VALUE_DIFF * ((this._level - maxLevel) / -SEMI_MAX_LEVEL) ** -(grow - 1)
-                  : start + VALUE_DIFF * (PREV_LEVEL / SEMI_MAX_LEVEL) ** (grow + 1);
+                  ? end -
+                    VALUE_DIFF *
+                      ((this.level - maxLevel) / -SEMI_MAX_LEVEL) ** -(grow - 1)
+                  : start +
+                    VALUE_DIFF * (PREV_LEVEL / SEMI_MAX_LEVEL) ** (grow + 1);
             } else {
               const early =
                 start +
-                (PREV_LEVEL * (VALUE_DIFF / SEMI_MAX_LEVEL) * (SEMI_MAX_LEVEL * 2 - PREV_LEVEL)) / SEMI_MAX_LEVEL;
-              const late = start + (PREV_LEVEL * (VALUE_DIFF / SEMI_MAX_LEVEL) * PREV_LEVEL) / SEMI_MAX_LEVEL;
+                (PREV_LEVEL *
+                  (VALUE_DIFF / SEMI_MAX_LEVEL) *
+                  (SEMI_MAX_LEVEL * 2 - PREV_LEVEL)) /
+                  SEMI_MAX_LEVEL;
+              const late =
+                start +
+                (PREV_LEVEL * (VALUE_DIFF / SEMI_MAX_LEVEL) * PREV_LEVEL) /
+                  SEMI_MAX_LEVEL;
 
-              currentValue = early * ((20 - grow - 10) / 20) + late * ((grow + 10) / 20);
+              currentValue =
+                early * ((20 - grow - 10) / 20) + late * ((grow + 10) / 20);
             }
           }
         }
@@ -1314,7 +1394,7 @@ const setCustomParams = () => {
     if (TCP.paramMemo[currentClassId][cparam.key] === undefined) {
       TCP.paramMemo[currentClassId][cparam.key] = {};
     }
-    TCP.paramMemo[currentClassId][cparam.key][this._level] = currentValue;
+    TCP.paramMemo[currentClassId][cparam.key][this.level] = currentValue;
 
     return currentValue;
   };
@@ -1373,7 +1453,10 @@ const setCustomParams = () => {
   Game_Enemy.prototype.customParamBase = function (cparam) {
     // レベルアップ対応は別プラグイン化
     let value = 0;
-    if (this.enemy().meta && this.enemy().meta[`add_${cparam.key}`] !== undefined) {
+    if (
+      this.enemy().meta &&
+      this.enemy().meta[`add_${cparam.key}`] !== undefined
+    ) {
       value += Number(this.enemy().meta[`add_${cparam.key}`]) || 0;
     }
 
@@ -1417,7 +1500,9 @@ const setCustomParams = () => {
   // Windows
   // -------------------------------------------------------------------------------------------------------------------
   const visibleParams = TCP.paramsDef.filter((p) => p.visible);
-  const visibleParamsInStatus = TCP.paramsDef.filter((p) => p.visible && p.key !== "mhp" && p.key !== "mmp");
+  const visibleParamsInStatus = TCP.paramsDef.filter(
+    (p) => p.visible && p.key !== "mhp" && p.key !== "mmp",
+  );
 
   // --------------------------------------------------------------------------
   // Window_StatusBase
@@ -1461,7 +1546,9 @@ const setCustomParams = () => {
     const width = this.paramX() - this.itemPadding() * 2;
     this.changeTextColor(ColorManager.systemColor());
     this.drawText(
-      (param.nameId === undefined ? param.name : TextManager.param(param.nameId)) + (param.isRate ? " [%]" : ""),
+      (param.nameId === undefined
+        ? param.name
+        : TextManager.param(param.nameId)) + (param.isRate ? " [%]" : ""),
       x,
       y,
       width,
@@ -1473,7 +1560,13 @@ const setCustomParams = () => {
     const paramWidth = this.paramWidth();
     const value = this._actor[param.type](param.paramId);
     this.resetTextColor();
-    this.drawText(param.isRate ? Math.round(value * 100) : value, x, y, paramWidth, "right");
+    this.drawText(
+      param.isRate ? Math.round(value * 100) : value,
+      x,
+      y,
+      paramWidth,
+      "right",
+    );
   };
 
   Window_EquipStatus.prototype.drawNewParam = function (x, y, paramId) {
@@ -1484,7 +1577,13 @@ const setCustomParams = () => {
     // 変化しない場合は非表示
     if (newValue === diffValue) return;
     this.changeTextColor(ColorManager.paramchangeTextColor(diffValue));
-    this.drawText(param.isRate ? Math.round(newValue * 100) : newValue, x, y, paramWidth, "right");
+    this.drawText(
+      param.isRate ? Math.round(newValue * 100) : newValue,
+      x,
+      y,
+      paramWidth,
+      "right",
+    );
   };
 
   // --------------------------------------------------------------------------
@@ -1504,7 +1603,9 @@ const setCustomParams = () => {
     this.changeTextColor(ColorManager.systemColor());
     // パラメータ名描画
     this.drawText(
-      (param.nameId === undefined ? param.name : TextManager.param(param.nameId)) + (param.isRate ? " [%]" : ""),
+      (param.nameId === undefined
+        ? param.name
+        : TextManager.param(param.nameId)) + (param.isRate ? " [%]" : ""),
       rect.x,
       rect.y,
       160,
@@ -1512,6 +1613,12 @@ const setCustomParams = () => {
     // パラメータ値描画
     const value = this._actor[param.type](param.paramId);
     this.resetTextColor();
-    this.drawText(param.isRate ? Math.round(value * 100) : value, rect.x + 160, rect.y, 60, "right");
+    this.drawText(
+      param.isRate ? Math.round(value * 100) : value,
+      rect.x + 160,
+      rect.y,
+      60,
+      "right",
+    );
   };
 })();

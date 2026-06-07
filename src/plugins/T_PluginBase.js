@@ -64,8 +64,12 @@
         return value;
       }
       if (typeof value === "string") {
-        if (["true", "t", "on", "yes", "y"].includes(value.toLowerCase())) return true;
-        if (["false", "f", "off", "no", "n"].includes(value.toLocaleLowerCase())) return false;
+        if (["true", "t", "on", "yes", "y"].includes(value.toLowerCase()))
+          return true;
+        if (
+          ["false", "f", "off", "no", "n"].includes(value.toLocaleLowerCase())
+        )
+          return false;
         try {
           const parsed = JSON.parse(value);
           return typeof parsed === "boolean" ? parsed : defaultValue;
@@ -96,7 +100,9 @@
       if (typeof value === "string") {
         try {
           const parsed = JSON.parse(value);
-          return typeof parsed === "number" && !Number.isNaN(parsed) ? parsed : defaultValue;
+          return typeof parsed === "number" && !Number.isNaN(parsed)
+            ? parsed
+            : defaultValue;
         } catch (error) {
           return defaultValue;
         }
@@ -121,5 +127,21 @@
 
       return String(value);
     },
+  };
+
+  window.PluginParamParser = PluginParamParser;
+
+  /**
+   * @memberof JsExtensions
+   * @param {number} min 
+   * @param {number} max (excluded)
+   * @returns {number}
+   */
+  Math.randomRangeInt = function (min, max) {
+    if (max < min) {
+      throw new RangeError("");
+    }
+
+    return Math.randomInt(max - min) + min;
   };
 })();

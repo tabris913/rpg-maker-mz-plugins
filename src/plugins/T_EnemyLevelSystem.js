@@ -18,10 +18,17 @@
  *   @on 表示する
  *   @off 表示しない
  *   @default false
+ * @param UseClassSkill
+ *   @text 職業スキル使用
+ *   @desc 敵キャラが職業スキルを使用する
+ *   @type boolean
+ *   @on 使用する
+ *   @off 使用しない
+ *   @default false
  *
  * @help
  * ==================================
- * T_EnemyLevelSystem.js [ja] v0.0.1
+ * T_EnemyLevelSystem.js [ja] v1.0.0
  * ==================================
  *
  * # Dependencies
@@ -60,20 +67,59 @@
  * 　職業のIDを設定します．
  * 　e.g. <classId: 1>
  * 　     --> (独自に変更してなければ) 職業は「剣士」
+ * <levelBonus: {value}>
+ * 　レベルボーナスを設定します．レベルを直接指定する以外の方法で設定した場合、
+ * 　計算されたレベルに付加されます．
+ * 　e.g. <levelBonus: 2>
+ * 　     --> レベルシンクでLv 15になった場合、この敵キャラはLv 17になります
+ * <skill_{skillId}: {type},{value1},{value2},{rating}>
+ * 　行動パターンを設定します．
+ * 　type: 行動条件の種類．デフォルトは0
+ * 　  0: 常時, 1: ターン, 2: HP, 3: MP,
+ * 　  4: ステート, 5: パーティLV, 6: スイッチ
+ * 　value1, value2: 条件の値．行動パターンの条件欄に倣って設定してください．
+ * 　rating: 優先度 (1～10)，デフォルトは5
+ * 　e.g. <skill_XX: 0,0,0,5>
+ * 　     --> 常時優先度5でID「XX」のスキルを行動する
+ * 　     ※ すべてデフォルト値なので <skill_12: ,,,> という書き方でもOK
+ * 　e.g. <skill_YY: 2,0,50,7>
+ * 　     --> HPが0%～50%のときに優先度7でID「YY」のスキルを行動する
+ * 　e.g. <skill_ZZ: 4,4,,1>
+ * 　     --> ID「4」のステートが付与されているときに優先度1でID「ZZ」のスキ
+ * 　         ルを行動する
  *
  * ### マップ
+ * 出現する敵キャラのレベルをメモに設定します．
  *
  * <levelSync>
+ * 　パーティの最高レベルにレベルシンクされるように設定します．
  * <levelSync: {value}>
+ * 　指定したレベルにレベルシンクされるように設定します．
+ * 　e.g. <levelSync: 15>
+ * 　     --> Lv. 15にレベルシンクされます
  * <enemy_{enemyId}: {value}>
+ * 　敵キャラを個別にレベル設定します．
+ * 　e.g. <enemy_1: 20>
+ * 　     --> (独自に変更してなければ) ゴブリンがLv. 20になります
  * <minLevel: {value}>
+ * 　敵キャラのレベルの最小値を設定します．デフォルトは1です．
+ * 　e.g. <minLevel: 30>
+ * 　     --> レベルの最小値は30になります
  * <maxLevel: {value}>
+ * 　敵キャラのレベルの最大値を設定します．デフォルトは1です．
+ * 　e.g. <maxLevel: 50>
+ * 　     --> レベルの最大値は50になります．
+ *
+ * レベルを決定する優先度は以下のとおりです．
+ * 1. <enemy_{enemyId}: {value}>
+ * 2. <levelSync> <levelSync: {value}>
+ * 3. <minLevel: {value}> <maxLevel: {value}>
  *
  * ================
  * Version History
  * ================
  * Ver.   Date        Desc.
- * 0.0.1  yyyy/MM/dd  初版作成
+ * 1.0.0  2026/06/dd  初版作成
  */
 
 /*~struct~:
@@ -101,7 +147,7 @@ const TELS = {};
  *
  * @param {HTMLOrSVGScriptElement | null} script
  */
-const readParams = (script) => {
+TELS.readParams = (script) => {
   /**
    * @type {import('./T_EnemyLevelSystem').RawParams}
    */
@@ -109,6 +155,8 @@ const readParams = (script) => {
   console.debug(params);
 
   TELS.showLevelInBattle = PluginParamParser.boolean(params.ShowLevelInBattle, false);
+  TELS.useClassSkill = PluginParamParser.boolean(params.UseClassSkill, false);
+  TELS.skillMap = {};
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -116,7 +164,7 @@ const readParams = (script) => {
 // ---------------------------------------------------------------------------------------------------------------------
 (() => {
   const script = document.currentScript;
-  readParams(script);
+  TELS.readParams(script);
 
   // -------------------------------------------------------------------------------------------------------------------
   // Objects
@@ -124,33 +172,43 @@ const readParams = (script) => {
   // --------------------------------------------------------------------------
   // Game_Enemy
   // --------------------------------------------------------------------------
-  Object.defineProperty(Game_Enemy.prototype, "_level", {
-    get: function () {
-      return getCurrentLevel();
-    },
-    configurable: true,
-  });
+  // Object.defineProperty(Game_Enemy.prototype, "_level", {
+  //   get: function () {
+  //     return this.getCurrentLevel();
+  //   },
+  //   configurable: true,
+  // });
   Object.defineProperty(Game_Enemy.prototype, "level", {
     get: function () {
+      if (!this._level) {
+        this._level = this.getCurrentLevel();
+      }
       return this._level;
     },
     configurable: true,
   });
 
-  _Game_Enemy_initMembers = Game_Enemy.prototype.initMembers;
+  const _Game_Enemy_initMembers = Game_Enemy.prototype.initMembers;
   Game_Enemy.prototype.initMembers = function () {
     _Game_Enemy_initMembers.call(this);
     this._classId = 0;
+    this._level = 0;
   };
 
-  _Game_Enemy_setup = Game_Enemy.prototype.setup;
+  const _Game_Enemy_setup = Game_Enemy.prototype.setup;
   Game_Enemy.prototype.setup = function (enemyId, x, y) {
     _Game_Enemy_setup.apply(this, arguments);
     this._classId = this.setupClassId();
   };
 
+  /**
+   *
+   * @returns {rm.types.RPGClass}
+   */
   Game_Enemy.prototype.currentClass = function () {
-    return Game_Actor.prototype.currentClass.call(this);
+    const cls = Game_Actor.prototype.currentClass.call(this);
+
+    return cls;
   };
 
   /**
@@ -175,6 +233,13 @@ const readParams = (script) => {
 
     // マップから設定を読み込む
     if ($dataMap && $dataMap.meta) {
+      if ($dataMap.meta[`enemy_${this._enemyId}`]) {
+        const parsed = Number($dataMap.meta[`enemy_${this._enemyId}`]);
+        if (parsed) {
+          return parsed;
+        }
+      }
+
       const levelSync = $dataMap.meta.levelSync;
       if (levelSync) {
         switch (typeof levelSync) {
@@ -184,46 +249,45 @@ const readParams = (script) => {
             }
             break;
           case "string":
-            level ||= Number(levelSync);
+            level = Number(levelSync) || level;
         }
+      } else {
+        minLevel = Number($dataMap.meta.minLevel) || minLevel;
+        maxLevel = Number($dataMap.meta.maxLevel) || maxLevel;
+        level = Math.randomRangeInt(minLevel, maxLevel + 1);
       }
-      const enemyLevelBonus = this.enemy().meta?.levelBonus;
-      if (enemyLevelBonus) {
-        level += Number(enemyLevelBonus) || 0;
-      }
-      const level = $dataMap.meta[`enemy_${this._enemyId}`];
 
-      minLevel ||= Number($dataMap.meta.minLevel);
-      maxLevel ||= Number($dataMap.meta.maxLevel);
-      // TODO [min, max]でランダム
       // 個別指定が勝つ
       // スキル
-
-      level ||= Number(level);
     }
 
-    return level.clamp(minLevel, maxLevel);
+    const enemyLevelBonus = this.enemy().meta?.levelBonus;
+    if (enemyLevelBonus) {
+      level += Number(enemyLevelBonus) || 0;
+    }
+
+    return level;
   };
 
-  _Game_Enemy_paramBase = Game_Enemy.prototype.paramBase;
+  const _Game_Enemy_paramBase = Game_Enemy.prototype.paramBase;
   /**
    *
    * @param {number} paramId
    * @returns
    */
   Game_Enemy.prototype.paramBase = function (paramId) {
-    if (this._classId !== undefined) {
+    if (this._classId) {
       // クラス指定あり
       const classData = $dataClasses[this._classId];
       if (classData && classData.params) {
-        return classData.params[paramId][this._level];
+        return classData.params[paramId][this.level];
       }
     }
 
     return _Game_Enemy_paramBase.apply(this, arguments);
   };
 
-  _Game_Enemy_customParamBase = Game_Enemy.prototype.customParamBase;
+  const _Game_Enemy_customParamBase = Game_Enemy.prototype.customParamBase;
   /**
    * T_CustomParameters.js を利用しているときのみ呼び出される
    *
@@ -231,22 +295,91 @@ const readParams = (script) => {
    * @returns {number}
    */
   Game_Enemy.prototype.customParamBase = function (cparam) {
-    if (this._classId !== undefined) {
+    if (this._classId) {
       // クラス指定あり
-      return Game_Actor.prototype.customParamBase.call(this, cparam);
+      const value = Game_Actor.prototype.customParamBase.call(this, cparam);
+      return value;
     }
 
     return _Game_Enemy_customParamBase.apply(this, arguments);
   };
 
-  _Game_Enemy_name = Game_Enemy.prototype.name;
+  // for log
+  const _Game_Enemy_param = Game_Enemy.prototype.param;
+  Game_Enemy.prototype.param = function (paramId) {
+    const value = _Game_Enemy_param.apply(this, arguments);
+
+    return value;
+  };
+
+  // for log
+  const _Game_Enemy_cparam = Game_Enemy.prototype.cparam;
+  Game_Enemy.prototype.cparam = function (cparamId) {
+    const value = _Game_Enemy_cparam.apply(this, arguments);
+
+    return value;
+  };
+
+  const _Game_Enemy_name = Game_Enemy.prototype.name;
   Game_Enemy.prototype.name = function () {
     const name = _Game_Enemy_name.call(this);
     if (TELS.showLevelInBattle) {
-      return `${name} Lv.${this._level}`;
+      return `${name} Lv.${this.level}`;
     }
 
     return name;
+  };
+
+  Game_Enemy.prototype.makeActions = function () {
+    Game_Battler.prototype.makeActions.call(this);
+    if (this.numActions() > 0) {
+      const enemy = this.enemy();
+      //
+      let actionList = enemy.actions;
+      if (TELS.useClassSkill) {
+        // 職業のスキルを使用する場合
+        if (TELS.skillMap[enemy.id] === undefined) {
+          TELS.skillMap[enemy.id] = {};
+        }
+        const skillMap = TELS.skillMap[enemy.id];
+        this.currentClass()
+          // 今のレベルまでに使えるスキル
+          .learnings.filter((l) => l.level <= this.level)
+          .forEach(({ skillId }) => {
+            if (skillMap[skillId] === undefined) {
+              if (enemy.meta[`skill_${skillId}`]) {
+                const configs = enemy.meta[`skill_${skillId}`]
+                  .split(",")
+                  .map((v) => v.trim())
+                  .map(Number);
+                skillMap[skillId] = {
+                  conditionParam1: configs[1] || 0,
+                  conditionParam2: configs[2] || 0,
+                  conditionType: configs[0] || 0,
+                  rating: configs[3] || 5,
+                  skillId,
+                };
+              } else {
+                skillMap[skillId] = {
+                  conditionParam1: 0,
+                  conditionParam2: 0,
+                  conditionType: 0,
+                  rating: 5,
+                  skillId: skillId,
+                };
+              }
+            }
+
+            actionList.push(skillMap[skillId]);
+          });
+      }
+      //
+      actionList = actionList.filter((a) => this.isActionValid(a));
+      if (actionList.length > 0) {
+        this.selectAllActions(actionList);
+      }
+    }
+    this.setActionState("waiting");
   };
 
   // -------------------------------------------------------------------------------------------------------------------
