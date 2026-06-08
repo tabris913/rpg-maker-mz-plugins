@@ -1,3 +1,5 @@
+/// <reference path="./T_CustomParameters.d.ts" />
+
 //=============================================================================
 // RPG Maker MZ - T_CustomParameters
 //=============================================================================
@@ -198,6 +200,11 @@
  *   @desc
  *   @type number
  *   @default 0.25
+ * @param criticalDamageRate
+ *   @text 会心ダメージ率
+ *   @desc
+ *   @type string
+ *   @default 3
  *
  * @help
  * ================================
@@ -222,6 +229,7 @@
  * - 命中率や回避率のような隠し能力値をステータス欄に表示させる
  * - 能力値の表示順を変更する
  * - バフ/デバフ1段階あたりの変化率を変更する
+ * - 会心ダメージの倍率を変更する
  *
  * # ⚠️注意点⚠️
  *
@@ -287,7 +295,7 @@
  * 　階で，標準を0として10に近づくほど晩熟，-10に近づくほど早熟になります．
  * 　e.g. <dex_growCurve: 10,500,0>
  * 　     --> レベル1では10，最大レベルでは500，成長タイプは標準です
- * <{key}_mode: drastic>
+ * <drasticMode>
  * 　成長タイプを急進モードに設定します．このタグを未指定の場合は通常能力値と同
  * 　じ上がり方になるので，具体的な値は能力値曲線を参照してください．急進モード
  * 　は，通常よりも早熟・晩熟の特徴の出方が激しくなります．
@@ -553,8 +561,6 @@
 
 /**
  * Global variable
- *
- * @type {import('./T_CustomParameters').GlobalV}
  */
 const TCP = {};
 
@@ -563,9 +569,9 @@ const TCP = {};
 // ---------------------------------------------------------------------------------------------------------------------
 /**
  *
- * @param {import('./T_CustomParameters').BuiltInParam2Input} definition
- * @param {Partial<import('./T_CustomParameters').BuiltInParam>} _default
- * @returns {import('./T_CustomParameters').BuiltInParam}
+ * @param {TCP.BuiltInParam2Input} definition
+ * @param {Partial<TCP.BuiltInParam>} _default
+ * @returns {TCP.BuiltInParam}
  */
 const parseNormalParam = (definition, _default) => ({
   key: _default.key,
@@ -580,9 +586,9 @@ const parseNormalParam = (definition, _default) => ({
 });
 /**
  *
- * @param {import('./T_CustomParameters').BuiltInParam2Input} definition
- * @param {Partial<import('./T_CustomParameters').BuiltInParam>} _default
- * @returns {import('./T_CustomParameters').BuiltInParam}
+ * @param {TCP.BuiltInParam2Input} definition
+ * @param {Partial<TCP.BuiltInParam>} _default
+ * @returns {TCP.BuiltInParam}
  */
 const parseXSParam = (definition, _default) => ({
   key: _default.key,
@@ -602,9 +608,9 @@ const parseXSParam = (definition, _default) => ({
  *
  * @param {HTMLOrSVGScriptElement | null} script
  */
-const readParams = (script) => {
+TCP.readParams = (script) => {
   /**
-   * @type {import('./T_CustomParameters').RawParams}
+   * @type {TCP.RawParams}
    */
   const params = PluginManagerEx.createParameter(script);
   console.debug(params);
@@ -612,7 +618,7 @@ const readParams = (script) => {
   /**
    * 組み込みパラメータ
    *
-   * @type {import('./T_CustomParameters').BuiltInParams}
+   * @type {TCP.BuiltInParams}
    */
   const builtInParams = {
     // 通常能力値
@@ -656,10 +662,28 @@ const readParams = (script) => {
       paramId: 5,
       nameId: 5,
     }),
-    agility: parseNormalParam(params.Agility, { key: "agi", visible: true, displayOrder: 4, paramId: 6, nameId: 6 }),
-    luck: parseNormalParam(params.Luck, { key: "luk", visible: true, displayOrder: 5, paramId: 7, nameId: 7 }),
+    agility: parseNormalParam(params.Agility, {
+      key: "agi",
+      visible: true,
+      displayOrder: 4,
+      paramId: 6,
+      nameId: 6,
+    }),
+    luck: parseNormalParam(params.Luck, {
+      key: "luk",
+      visible: true,
+      displayOrder: 5,
+      paramId: 7,
+      nameId: 7,
+    }),
     // 追加能力値
-    hitRate: parseXSParam(params.HitRate, { key: "hit", displayOrder: 6, paramId: 0, nameId: 8, type: "xparam" }),
+    hitRate: parseXSParam(params.HitRate, {
+      key: "hit",
+      displayOrder: 6,
+      paramId: 0,
+      nameId: 8,
+      type: "xparam",
+    }),
     evasionRate: parseXSParam(params.EvasionRate, {
       key: "eva",
       displayOrder: 7,
@@ -797,12 +821,12 @@ const readParams = (script) => {
   };
 
   /**
-   * @type Array<import('./T_CustomParameters').CustomParamInput>
+   * @type Array<TCP.CustomParamInput>
    */
   const temporaryParams = params.ParamJson || [];
   console.debug(temporaryParams);
   /**
-   * @type Array<import('./T_CustomParameters').Cparam>
+   * @type Array<TCP.Cparam>
    */
   const additionalParams = temporaryParams.map((tp, index) => ({
     key: tp.key || `key_${index}`,
@@ -820,7 +844,7 @@ const readParams = (script) => {
     type: "cparam",
   }));
   /**
-   * @type Array<import('./T_CustomParameters').ParamsDef>
+   * @type Array<TCP.ParamsDef>
    */
   const paramsDef = [
     builtInParams.maximumHitPoints,
@@ -857,6 +881,7 @@ const readParams = (script) => {
   TCP.buffRate = params.buffRate ?? 0.25;
   TCP.paramMemo = {};
   TCP.presentValues = { HP: params.HitPoints, MP: params.MagicPoints };
+  TCP.criticalDamageRate = Number(params.criticalDamageRate) || 3;
 };
 
 /**
@@ -864,7 +889,7 @@ const readParams = (script) => {
  */
 const setCustomParams = () => {
   /**
-   * @type Array<import('./T_CustomParameters').Cparam>
+   * @type Array<TCP.Cparam>
    */
   const customParameters = TCP.paramsDef.filter((p) => p.type === "cparam");
 
@@ -879,7 +904,7 @@ const setCustomParams = () => {
 
   let isDatabaseLoaded = false;
   let customParamForClasses = {};
-  _DataManager_isDatabaseLoaded = DataManager.isDatabaseLoaded;
+  const _DataManager_isDatabaseLoaded = DataManager.isDatabaseLoaded;
   DataManager.isDatabaseLoaded = function () {
     if (!_DataManager_isDatabaseLoaded.call(this)) return false;
     if (!isDatabaseLoaded) {
@@ -899,7 +924,7 @@ const setCustomParams = () => {
                     break;
                   case `${cparam.key}_maxLevel`:
                   default:
-                    const tagName = classMetaKey.relace(`${cparam.key}_`, "");
+                    const tagName = key.replace(`${cparam.key}_`, "");
                     customParamForClasses[cls.id][cparam.key][tagName] = Number(value);
                 }
               }
@@ -908,6 +933,7 @@ const setCustomParams = () => {
         }
       }
       console.debug(customParamForClasses);
+      TCP.customParamForClasses = customParamForClasses;
       isDatabaseLoaded = true;
     }
     return true;
@@ -919,9 +945,14 @@ const setCustomParams = () => {
 // ---------------------------------------------------------------------------------------------------------------------
 (() => {
   const script = document.currentScript;
-  readParams(script);
+  TCP.readParams(script);
 
   setCustomParams();
+
+  /**
+   * @type Array<TCP.Cparam>
+   */
+  const customParameters = TCP.paramsDef.filter((p) => p.type === "cparam");
 
   // -------------------------------------------------------------------------------------------------------------------
   // Objects
@@ -966,10 +997,20 @@ const setCustomParams = () => {
     this.updateLastTarget(target);
   };
 
+  /**
+   *
+   * @param {number} damage
+   * @returns
+   * @override
+   */
+  Game_Action.prototype.applyCritical = function (damage) {
+    return damage * TCP.criticalDamageRate;
+  };
+
   // --------------------------------------------------------------------------
   // Game_ActionResult
   // --------------------------------------------------------------------------
-  _Game_ActionResult_clear = Game_ActionResult.prototype.clear;
+  const _Game_ActionResult_clear = Game_ActionResult.prototype.clear;
   Game_ActionResult.prototype.clear = function () {
     _Game_ActionResult_clear.apply(this, arguments);
     this.addedCustomBuffs = [];
@@ -977,7 +1018,7 @@ const setCustomParams = () => {
     this.removedCustomBuffs = [];
   };
 
-  _Game_ActionResult_isStatusAffected = Game_ActionResult.prototype.isStatusAffected;
+  const _Game_ActionResult_isStatusAffected = Game_ActionResult.prototype.isStatusAffected;
   Game_ActionResult.prototype.isStatusAffected = function () {
     return (
       _Game_ActionResult_isStatusAffected.apply(this, arguments) ||
@@ -1020,13 +1061,13 @@ const setCustomParams = () => {
   // --------------------------------------------------------------------------
   // Game_BattlerBase
   // --------------------------------------------------------------------------
-  _Game_BattlerBase_clearParamPlus = Game_BattlerBase.prototype.clearParamPlus;
+  const _Game_BattlerBase_clearParamPlus = Game_BattlerBase.prototype.clearParamPlus;
   Game_BattlerBase.prototype.clearParamPlus = function () {
     _Game_BattlerBase_clearParamPlus.apply(this, arguments);
     this._customParamPlus = Array(customParameters.length).fill(0);
   };
 
-  _Game_BattlerBase_clearBuffs = Game_BattlerBase.prototype.clearBuffs;
+  const _Game_BattlerBase_clearBuffs = Game_BattlerBase.prototype.clearBuffs;
   Game_BattlerBase.prototype.clearBuffs = function () {
     _Game_BattlerBase_clearBuffs.apply(this, arguments);
     this._customBuffs = Array(customParameters.length).fill(0);
@@ -1088,7 +1129,7 @@ const setCustomParams = () => {
     return this._customBuffTurns[cparamId] === 0;
   };
 
-  _Game_BattlerBase_updateBuffTurns = Game_BattlerBase.prototype.updateBuffTurns;
+  const _Game_BattlerBase_updateBuffTurns = Game_BattlerBase.prototype.updateBuffTurns;
   Game_BattlerBase.prototype.updateBuffTurns = function () {
     _Game_BattlerBase_updateBuffTurns.apply(this, arguments);
     for (let i = 0; i < this._customBuffTurns.length; i++) {
@@ -1101,7 +1142,7 @@ const setCustomParams = () => {
   /**
    * To be overridden in Game_Actor or Game_Enemy
    *
-   * @param {import('./T_CustomParameters').Cparam} param
+   * @param {TCP.Cparam} param
    * @returns
    */
   Game_BattlerBase.prototype.customParamBase = function (param) {
@@ -1110,7 +1151,7 @@ const setCustomParams = () => {
 
   /**
    *
-   * @param {import('./T_CustomParameters').Cparam} param
+   * @param {TCP.Cparam} param
    * @returns
    */
   Game_BattlerBase.prototype.customParamPlus = function (param) {
@@ -1119,7 +1160,7 @@ const setCustomParams = () => {
 
   /**
    *
-   * @param {import('./T_CustomParameters').Cparam} param
+   * @param {TCP.Cparam} param
    * @returns
    */
   Game_BattlerBase.prototype.customParamBasePlus = function (param) {
@@ -1129,7 +1170,7 @@ const setCustomParams = () => {
   /**
    * To be overridden in Game_Actor or Game_Enemy
    *
-   * @param {import('./T_CustomParameters').Cparam} param
+   * @param {TCP.Cparam} param
    * @returns
    */
   Game_BattlerBase.prototype.customParamRate = function (param) {
@@ -1199,7 +1240,7 @@ const setCustomParams = () => {
     }
   };
 
-  _Game_Battler_removeAllBuffs = Game_Battler.prototype.removeAllBuffs;
+  const _Game_Battler_removeAllBuffs = Game_Battler.prototype.removeAllBuffs;
   Game_Battler.prototype.removeAllBuffs = function () {
     _Game_Battler_removeAllBuffs.apply(this, arguments);
     for (let i = 0; i < this.customBuffLength(); i++) {
@@ -1207,7 +1248,7 @@ const setCustomParams = () => {
     }
   };
 
-  _Game_Battler_removeBuffsAuto = Game_Battler.prototype.removeBuffsAuto;
+  const _Game_Battler_removeBuffsAuto = Game_Battler.prototype.removeBuffsAuto;
   Game_Battler.prototype.removeBuffsAuto = function () {
     _Game_Battler_removeBuffsAuto.apply(this, arguments);
     for (let i = 0; i < this.customBuffLength(); i++) {
@@ -1220,7 +1261,7 @@ const setCustomParams = () => {
   // --------------------------------------------------------------------------
   // Game_Actor
   // --------------------------------------------------------------------------
-  _Game_Actor_paramRate = Game_Actor.prototype.paramRate;
+  const _Game_Actor_paramRate = Game_Actor.prototype.paramRate;
   Game_Actor.prototype.paramRate = function (paramId) {
     let value = _Game_Actor_paramRate.call(this, paramId);
     const param = TCP.paramsDef.find((p) => p.type === "param" && p.paramId === paramId);
@@ -1236,7 +1277,7 @@ const setCustomParams = () => {
 
   /**
    *
-   * @param {import('./T_CustomParameters').Cparam} cparam
+   * @param {TCP.Cparam} cparam
    * @see Game_BattlerBase.prototype.customParamBase
    */
   Game_Actor.prototype.customParamBase = function (cparam) {
@@ -1244,8 +1285,8 @@ const setCustomParams = () => {
      * @type number
      */
     const currentClassId = this.currentClass().id;
-    if (TCP.paramMemo[currentClassId]?.[cparam.key]?.[this._level] !== undefined) {
-      return TCP.paramMemo[currentClassId][cparam.key][this._level];
+    if (TCP.paramMemo[currentClassId]?.[cparam.key]?.[this.level] !== undefined) {
+      return TCP.paramMemo[currentClassId][cparam.key][this.level];
     }
 
     let currentValue = 0;
@@ -1268,30 +1309,30 @@ const setCustomParams = () => {
         }
         break;
       case "grow":
-        const configs = customParamForClasses[currentClassId][cparam.key];
-        const levelConfig = configs[`lv${this._level}`];
+        const configs = TCP.customParamForClasses[currentClassId][cparam.key];
+        const levelConfig = configs[`lv${this.level}`];
         if (typeof levelConfig === "number" && !Number.isNaN(levelConfig)) {
-          currentValue = configs[`lv${this._level}`];
+          currentValue = configs[`lv${this.level}`];
         } else {
           const growCurveConfig = configs.growCurve;
           if (!Array.isArray(growCurveConfig) || growCurveConfig.some((c) => typeof c !== "number")) {
-            throw new Error(`${cparam.name}の計算/取得ができません (レベル ${this._level})`);
+            throw new Error(`${cparam.name}の計算/取得ができません (レベル ${this.level})`);
           }
 
           const [start, end, grow] = growCurveConfig;
 
           const maxLevel = configs.maxLevel ?? this.maxLevel();
-          if (this._level >= maxLevel) {
+          if (this.level >= maxLevel) {
             currentValue = end;
           } else {
             const VALUE_DIFF = end - start;
-            const PREV_LEVEL = this._level - 1;
+            const PREV_LEVEL = this.level - 1;
             const SEMI_MAX_LEVEL = maxLevel - 1;
 
-            if (configs.mode?.trim() === "drastic") {
+            if (configs.drasticMode) {
               currentValue =
                 grow < 0
-                  ? end - VALUE_DIFF * ((this._level - maxLevel) / -SEMI_MAX_LEVEL) ** -(grow - 1)
+                  ? end - VALUE_DIFF * ((this.level - maxLevel) / -SEMI_MAX_LEVEL) ** -(grow - 1)
                   : start + VALUE_DIFF * (PREV_LEVEL / SEMI_MAX_LEVEL) ** (grow + 1);
             } else {
               const early =
@@ -1314,14 +1355,14 @@ const setCustomParams = () => {
     if (TCP.paramMemo[currentClassId][cparam.key] === undefined) {
       TCP.paramMemo[currentClassId][cparam.key] = {};
     }
-    TCP.paramMemo[currentClassId][cparam.key][this._level] = currentValue;
+    TCP.paramMemo[currentClassId][cparam.key][this.level] = currentValue;
 
     return currentValue;
   };
 
   /**
    *
-   * @param {import('./T_CustomParameters').Cparam} param
+   * @param {TCP.Cparam} param
    * @see Game_BattlerBase.prototype.customParamPlus
    */
   Game_Actor.prototype.customParamPlus = function (param) {
@@ -1329,12 +1370,12 @@ const setCustomParams = () => {
     // 加算のみ
     for (const item of this.equips() || []) {
       if (item && item.meta[`add_${param.key}`] !== undefined) {
-        value += Number(item.meta[`add_${param.key}`]);
+        value += Number(item.meta[`add_${param.key}`]) || 0;
       }
     }
     for (const state of this.states()) {
       if (state && state.meta[`add_${param.key}`] !== undefined) {
-        value += Number(state.meta[`add_${param.key}`]);
+        value += Number(state.meta[`add_${param.key}`]) || 0;
       }
     }
 
@@ -1343,7 +1384,7 @@ const setCustomParams = () => {
 
   /**
    *
-   * @param {import('./T_CustomParameters').Cparam} param
+   * @param {TCP.Cparam} param
    * @see Game_BattlerBase.prototype.customParamRate
    */
   Game_Actor.prototype.customParamRate = function (param) {
@@ -1367,7 +1408,7 @@ const setCustomParams = () => {
   // --------------------------------------------------------------------------
   /**
    *
-   * @param {import('./T_CustomParameters').Cparam} cparam
+   * @param {TCP.Cparam} cparam
    * @see Game_BattlerBase.prototype.customParamBase
    */
   Game_Enemy.prototype.customParamBase = function (cparam) {
@@ -1382,7 +1423,7 @@ const setCustomParams = () => {
 
   /**
    *
-   * @param {import('./T_CustomParameters').Cparam} cparam
+   * @param {TCP.Cparam} cparam
    * @see Game_BattlerBase.prototype.customParamPlus
    */
   Game_Enemy.prototype.customParamPlus = function (cparam) {
@@ -1399,7 +1440,7 @@ const setCustomParams = () => {
 
   /**
    *
-   * @param {import('./T_CustomParameters').Cparam} cparam
+   * @param {TCP.Cparam} cparam
    * @see Game_BattlerBase.prototype.customParamRate
    */
   Game_Enemy.prototype.customParamRate = function (cparam) {

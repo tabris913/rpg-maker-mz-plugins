@@ -1,3 +1,4 @@
+/// <reference path="./T_PluginBase.d.ts" />
 //=============================================================================
 // RPG Maker MZ - T_PluginBase
 //=============================================================================
@@ -44,85 +45,77 @@
 
 "use strict";
 
+const PluginParamParser = {
+  array: (value) => {
+    if (Array.isArray(value)) return value;
+
+    return [];
+  },
+  boolean: (value, defaultValue = undefined) => {
+    if (defaultValue !== undefined && typeof defaultValue !== "boolean") {
+      throw new Error("Default value must be a boolean value or undefined.");
+    }
+
+    if (value === undefined || value === null || value === "") {
+      return defaultValue;
+    }
+    if (typeof value === "boolean") {
+      return value;
+    }
+    if (typeof value === "string") {
+      if (["true", "t", "on", "yes", "y"].includes(value.toLowerCase())) return true;
+      if (["false", "f", "off", "no", "n"].includes(value.toLocaleLowerCase())) return false;
+      try {
+        const parsed = JSON.parse(value);
+        return typeof parsed === "boolean" ? parsed : defaultValue;
+      } catch (error) {
+        return defaultValue;
+      }
+    }
+
+    return defaultValue;
+  },
+  number: (value, defaultValue = undefined) => {
+    if (defaultValue !== undefined && typeof defaultValue !== "number") {
+      throw new Error("Default value must be a number or undefined.");
+    }
+
+    if (value === undefined || value === null || value === "") {
+      return defaultValue;
+    }
+    if (typeof value === "number") {
+      return Number.isNaN(value) ? defaultValue : value;
+    }
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        return typeof parsed === "number" && !Number.isNaN(parsed) ? parsed : defaultValue;
+      } catch (error) {
+        return defaultValue;
+      }
+    }
+
+    return defaultValue;
+  },
+  string: (value, defaultValue = undefined) => {
+    if (defaultValue !== undefined && typeof defaultValue !== "string") {
+      throw new Error("Default value must be a string or undefined.");
+    }
+
+    if (value === undefined || value === null) return defaultValue;
+
+    if (typeof value === "string") return value;
+
+    return String(value);
+  },
+  struct: (value) => {
+    if (typeof value === "object") return value;
+
+    return undefined;
+  },
+};
+
 (() => {
-  const PluginParamParser = {
-    /**
-     *
-     * @param {unknown} value
-     * @param {boolean | undefined} defaultValue
-     * @returns {boolean | undefined}
-     */
-    boolean: (value, defaultValue = undefined) => {
-      if (defaultValue !== undefined && typeof defaultValue !== "boolean") {
-        throw new Error("Default value must be a boolean value or undefined.");
-      }
-
-      if (value === undefined || value === null || value === "") {
-        return defaultValue;
-      }
-      if (typeof value === "boolean") {
-        return value;
-      }
-      if (typeof value === "string") {
-        if (["true", "t", "on", "yes", "y"].includes(value.toLowerCase())) return true;
-        if (["false", "f", "off", "no", "n"].includes(value.toLocaleLowerCase())) return false;
-        try {
-          const parsed = JSON.parse(value);
-          return typeof parsed === "boolean" ? parsed : defaultValue;
-        } catch (error) {
-          return defaultValue;
-        }
-      }
-
-      return defaultValue;
-    },
-    /**
-     *
-     * @param {unknown} value
-     * @param {number | undefined} defaultValue
-     * @returns {number | undefined}
-     */
-    number: (value, defaultValue = undefined) => {
-      if (defaultValue !== undefined && typeof defaultValue !== "number") {
-        throw new Error("Default value must be a number or undefined.");
-      }
-
-      if (value === undefined || value === null || value === "") {
-        return defaultValue;
-      }
-      if (typeof value === "number") {
-        return Number.isNaN(value) ? defaultValue : value;
-      }
-      if (typeof value === "string") {
-        try {
-          const parsed = JSON.parse(value);
-          return typeof parsed === "number" && !Number.isNaN(parsed) ? parsed : defaultValue;
-        } catch (error) {
-          return defaultValue;
-        }
-      }
-
-      return defaultValue;
-    },
-    /**
-     *
-     * @param {unknown} value
-     * @param {string | undefined} defaultValue
-     * @returns {string | undefined}
-     */
-    string: (value, defaultValue = undefined) => {
-      if (defaultValue !== undefined && typeof defaultValue === "string") {
-        throw new Error("Default value must be a string or undefined.");
-      }
-
-      if (value === undefined || value === null) return defaultValue;
-
-      if (typeof value === "string") return value;
-
-      return String(value);
-    },
-  };
-
   window.PluginParamParser = PluginParamParser;
 
   /**
