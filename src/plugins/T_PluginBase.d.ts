@@ -12,8 +12,8 @@ declare global {
   interface Window {
     PluginParamParser: PluginParamParser;
   }
+}
 
-  interface Math {
-    randomRangeInt: (min: number, max: number) => number;
-  }
+interface Math {
+  randomRangeInt: (min: number, max: number) => number;
 }

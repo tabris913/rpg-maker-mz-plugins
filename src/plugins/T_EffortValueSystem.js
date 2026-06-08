@@ -32,7 +32,7 @@
  *
  * @help
  * ================================
- * T_EffortValueSystem.js [ja] v0.0.1
+ * T_EffortValueSystem.js [ja] v1.0.0
  * ================================
  *
  * 確率能力値には反映されない
@@ -41,11 +41,7 @@
  * Version History
  * ================
  * Ver.   Date        Desc.
- * 0.0.1  yyyy/MM/dd  初版作成
- */
-
-/*~struct~:
- *
+ * 1.0.0  2026/06/dd  初版作成
  */
 
 "use strict";
@@ -99,23 +95,58 @@ const readParams = (script) => {
   };
 
   BattleManager.gainEffortValues = function () {
+    /**
+     * @type {Array<Game_Enemy>}
+     */
     const defeatedEnemies = $gameTroop.deadMembers();
+    /**
+     * @type {Array<Game_Actor>}
+     */
     const survivors = $gameParty.battleMembers().filter((actor) => actor.isAlive());
 
     defeatedEnemies.forEach((enemy) => {
-      for (let i = 0; i < 8; i++) {
-        const tag = `EV_Gain${i}`;
-        const gain = Number(enemy.enemy().meta[tag] || 0);
-        if (gain > 0) {
-          survivors.forEach((actor) => actor.gainEV(i, gain));
-        }
-      }
+      Object.entries(enemy.enemy().meta)
+        .filter(([key]) => key.startsWith("ev_"))
+        .forEach(([key, value]) => {
+          const paramKey = Number(key.replace("ev_", ""));
+          const gain = Number(value.trim()) || 0;
+          if (gain > 0) {
+            survivors.forEach((actor) => actor.gainEV(paramKey, gain));
+          }
+        });
     });
   };
 
   // -------------------------------------------------------------------------------------------------------------------
   // Objects
   // -------------------------------------------------------------------------------------------------------------------
+  // ----------------------------------------------------------------------------
+  // Game_Action
+  // ----------------------------------------------------------------------------
+  const _Game_Action_applyItemEffect = Game_Action.prototype.applyItemEffect;
+  Game_Action.prototype.applyItemEffect = function (target, effect) {
+    _Game_Action_applyItemEffect.call(this, target, effect);
+
+    if (target.isActor()) {
+      const item = this.item();
+
+      Object.entries(item.meta).forEach(([key, value]) => {
+        // 努力値リセットアイテム
+        if (key === "evResetAll" && value) {
+          target.resetEVs();
+        } else if (key.startsWith("evReset_")) {
+          target.resetEV(key.replace("evReset_"));
+        } else if (key.startsWith("evAdd_")) {
+          // 努力値増減アイテム (EV_Change[ID])
+          const value = Number(value);
+          if (!Number.isNaN(value)) {
+            target.gainEV(key.replace("evAdd_"), value);
+          }
+        }
+      });
+    }
+  };
+
   // ----------------------------------------------------------------------------
   // Game_Actor
   // ----------------------------------------------------------------------------
@@ -145,26 +176,30 @@ const readParams = (script) => {
     return this._effortValues.concat(this._effortValuesCustom).reduce((a, b) => a + b, 0);
   };
 
+  const paramKeys = ["mhp", "mmp", "atk", "def", "mat", "mdf", "agi", "luk"];
   /**
    * 努力値を獲得する
    *
-   * @param {string} type
-   * @param {number} paramId
+   * @param {string} paramKey
    * @param {number} value
    */
-  Game_Actor.prototype.gainEV = function (type, paramId, value) {
+  Game_Actor.prototype.gainEV = function (paramKey, value) {
     let currentTotal = this.totalEffortValues();
-    let currentVal;
-    switch (type) {
-      case "param":
-        currentVal = this._effortValues[paramId];
-        break;
-      case "cparam":
+    let currentVal, paramId, type;
+    if (paramKeys.includes(paramKey)) {
+      type = "param";
+      paramId = paramKeys.indexOf(paramKey);
+      currentVal = this._effortValues[paramId];
+    } else {
+      const param = TCP.paramsDef.find((p) => p.key === paramKey);
+      if (TEVS.isEnabledTCP && param?.type === "cparam") {
+        type = "cparam";
+        paramId = param?.paramId;
         currentVal = this._effortValuesCustom[paramId];
-        break;
-      default:
-        console.warn(`通常能力値および独自能力値ではない能力値(${type},${paramId})の努力値獲得が試みられました．`);
+      } else {
+        console.warn(`通常能力値および独自能力値ではない能力値(${paramKey})の努力値獲得が試みられました．`);
         return;
+      }
     }
 
     // 合計上限と個別上限のチェック
@@ -181,19 +216,18 @@ const readParams = (script) => {
   /**
    * 個別努力値をリセットする
    *
-   * @param {string} type
-   * @param {number} paramId
+   * @param {string} paramKey
    */
-  Game_Actor.prototype.resetEV = function (type, paramId) {
-    switch (type) {
-      case "param":
-        this._effortValues[paramId] = 0;
-        break;
-      case "cparam":
-        this._effortValuesCustom[paramId] = 0;
-        break;
-      default:
-        console.warn(`通常能力値および独自能力値ではない能力値(${type},${paramId})の努力値リセットが試みられました．`);
+  Game_Actor.prototype.resetEV = function (paramKey) {
+    if (paramKeys.includes(paramKey)) {
+      this._effortValues[paramKey.indexOf(paramKey)] = 0;
+    } else {
+      const param = TCP.paramsDef.find((p) => p.key === paramKey);
+      if (TEVS.isEnabledTCP && param?.type === "cparam") {
+        this._effortValuesCustom[param?.paramId] = 0;
+      } else {
+        console.warn(`通常能力値および独自能力値ではない能力値(${paramKey})の努力値リセットが試みられました．`);
+      }
     }
   };
 

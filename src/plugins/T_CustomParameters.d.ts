@@ -1,5 +1,5 @@
 declare const TCP: {
-  paramsDef: Array<ParamsDef>;
+  paramsDef: Array<TCP.ParamsDef>;
   buffRate: number;
   paramMemo: Record<number, Record<string, Record<number, number>>>;
   presentValues: { HP: boolean; MP: boolean };

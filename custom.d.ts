@@ -1,3 +1,5 @@
+// rmmz_core.js で定義されている，JS 拡張
+
 interface Array<T> {
   clone: () => Array<T>;
   contains: (element: T) => boolean;

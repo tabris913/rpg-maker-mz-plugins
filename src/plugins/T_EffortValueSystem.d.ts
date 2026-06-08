@@ -8,7 +8,7 @@ declare const TEVS: {
 type ParamsRaw = Record<"Threshold" | "TotalMax" | "IndividualMax", unknown>;
 
 interface BattleManager {
-  static gainEffortValues: () => void;
+  gainEffortValues: () => void;
 }
 
 interface Game_Actor {
@@ -16,8 +16,8 @@ interface Game_Actor {
   _effortValuesCustom: Array<number>;
 
   initEV: () => void;
-  gainEV: (type: string, paramId: number, value: number) => void;
-  resetEV: (type: string, paramId: number) => void;
+  gainEV: (paramKey: string, value: number) => void;
+  resetEV: (paramKey: string) => void;
   resetEVs: () => void;
   totalEffortValues: () => number;
 }

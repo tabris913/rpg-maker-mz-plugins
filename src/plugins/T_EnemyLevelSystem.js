@@ -1,3 +1,5 @@
+/// <reference path="./T_EnemyLevelSystem.d.ts" />
+
 //=============================================================================
 // RPG Maker MZ - T_EnemyLevelSystem
 //=============================================================================
@@ -130,8 +132,6 @@
 
 /**
  * Global variable
- *
- * @type {import('./T_EnemyLevelSystem').GlobalV}
  */
 const TELS = {};
 
@@ -149,7 +149,7 @@ const TELS = {};
  */
 TELS.readParams = (script) => {
   /**
-   * @type {import('./T_EnemyLevelSystem').RawParams}
+   * @type {TELS.RawParams}
    */
   const params = PluginManagerEx.createParameter(script);
   console.debug(params);
@@ -291,7 +291,7 @@ TELS.readParams = (script) => {
   /**
    * T_CustomParameters.js を利用しているときのみ呼び出される
    *
-   * @param {import('./T_CustomParameters').Cparam} cparam
+   * @param {TCP.Cparam} cparam
    * @returns {number}
    */
   Game_Enemy.prototype.customParamBase = function (cparam) {

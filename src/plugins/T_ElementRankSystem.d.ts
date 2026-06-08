@@ -13,7 +13,7 @@ type InstantDeathRank = { name: string; isEnabled: boolean };
 declare const isCustomRank: (input: any) => input is CustomRank;
 
 declare namespace TERS {
-  export type RawParams = {
+  type RawParams = {
     ResistRanks: Array<CustomRankInput | string> | string;
     WeakRanks: Array<CustomRankInput | string> | string;
     NormalRankName: string;
@@ -27,4 +27,14 @@ declare namespace TERS {
     name?: string;
     isEnabled?: boolean | string;
   };
+}
+
+interface Game_BattlerBase {
+  setupElementRank: () => void;
+}
+
+interface Game_Battler {
+  onAbsorb: (value: number) => void;
+  onNullDamage: () => void;
+  elementPlus: (elementId: number) => number;
 }
