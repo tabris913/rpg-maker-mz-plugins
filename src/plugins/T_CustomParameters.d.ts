@@ -156,3 +156,41 @@ export type GlobalV = {
   paramMemo: Record<number, Record<string, Record<number, number>>>;
   presentValues: { HP: boolean; MP: boolean };
 };
+
+interface Game_ActionResult {
+  isCustomBuffAdded: (cparamId: number) => boolean;
+  pushAddedCustomBuff: (cparamId: number) => void;
+  isCustomDebuffAdded: (cparamId: number) => boolean;
+  pushAddedCustomDebuff: (cparamId: number) => void;
+  isCustomBuffRemoved: (cparamId: number) => boolean;
+  pushRemovedCustomBuff: (cparamId: number) => boolean;
+}
+
+interface Game_BattlerBase {
+  eraseCustomBuff: (cparamId: number) => void;
+  customBuffLength: () => number;
+  customBuff: (cparamId: number) => number;
+  isCustomBuffAffected: (cparamId: number) => boolean;
+  isCustomDebuffAffected: (cparamId: number) => boolean;
+  isCustomBuffOrDebuffAffected: (cparamId: number) => boolean;
+  isMaxCustomBuffAffected: (cparamId: number) => boolean;
+  isMaxCustomDebuffAffected: (cparamId: number) => boolean;
+  increaseCustomBuff: (cparamId: number) => void;
+  decreaseCustomBuff: (cparamId: number) => void;
+  overwriteCustomBuffTurns: (cparamId: number, turns: number) => void;
+  isCustomBuffExpired: (cparamId: number) => boolean;
+
+  customParamBase: (param: Cparam) => number;
+  customParamPlus: (param: Cparam) => number;
+  customParamBasePlus: (param: Cparam) => number;
+  customParamRate: (param: Cparam) => number;
+  customParamBuffRate: (cparamId: number) => number;
+  cparam: (cparamId: number) => number;
+  addCustomParam: (cparamId: number, value: number) => void;
+}
+
+interface Game_Battler {
+  addCustomBuff: (cparamId: number, turns: number) => void;
+  addCustomDebuff: (cparamId: number, turns: number) => void;
+  removeCustomBuff: (cparamId: number) => void;
+}
