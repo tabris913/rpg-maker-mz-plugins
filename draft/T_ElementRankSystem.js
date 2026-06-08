@@ -70,171 +70,171 @@
  */
 
 (() => {
-    'use strict';
-    const pluginName = "ElementRankDynamicSystem";
+  "use strict";
+  const pluginName = "ElementRankDynamicSystem";
 
-    // --- 1. 耐性配列と倍率マップの動的構築 ---
-    const RANK_ORDER = ["absorb", "null"];
-    const RANK_RATES = {
-        "absorb": -1.0,
-        "null": 0.0,
-        "normal": 1.0,
-        "death": 2.0
-    };
+  // --- 1. 耐性配列と倍率マップの動的構築 ---
+  const RANK_ORDER = ["absorb", "null"];
+  const RANK_RATES = {
+    absorb: -1.0,
+    null: 0.0,
+    normal: 1.0,
+    death: 2.0,
+  };
 
-    // プラグインパラメータの解析
-    const params = PluginManager.parameters(pluginName);
-    
-    // ① 無効(null) と 通常(normal) の間の耐性段階を挿入
-    if (params.ResistRanks) {
-        try {
-            JSON.parse(params.ResistRanks).forEach(itemStr => {
-                const item = JSON.parse(itemStr);
-                if (item.key) {
-                    RANK_ORDER.push(item.key);
-                    RANK_RATES[item.key] = Number(item.rate || 0.5);
-                }
-            });
-        } catch (e) { console.error(e); }
+  // プラグインパラメータの解析
+  const params = PluginManager.parameters(pluginName);
+
+  // ① 無効(null) と 通常(normal) の間の耐性段階を挿入
+  if (params.ResistRanks) {
+    try {
+      JSON.parse(params.ResistRanks).forEach((itemStr) => {
+        const item = JSON.parse(itemStr);
+        if (item.key) {
+          RANK_ORDER.push(item.key);
+          RANK_RATES[item.key] = Number(item.rate || 0.5);
+        }
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // 通常を挿入
+  RANK_ORDER.push("normal");
+
+  // ② 通常(normal) と 即死(death) の間の弱点段階を挿入
+  if (params.WeakRanks) {
+    try {
+      JSON.parse(params.WeakRanks).forEach((itemStr) => {
+        const item = JSON.parse(itemStr);
+        if (item.key) {
+          RANK_ORDER.push(item.key);
+          RANK_RATES[item.key] = Number(item.rate || 1.5);
+        }
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // 最後に即死を挿入
+  RANK_ORDER.push("death");
+
+  // デバッグ用に最終的な配列構造をコンソールに出力
+  console.log("【耐性段階システム】構築された耐性ライン:", RANK_ORDER);
+  console.log("【耐性段階システム】各段階の倍率:", RANK_RATES);
+
+  // --- 2. バトラーに一時的な耐性変動値を保存する領域を作る ---
+  const _Game_BattlerBase_initMembers = Game_BattlerBase.prototype.initMembers;
+  Game_BattlerBase.prototype.initMembers = function () {
+    _Game_BattlerBase_initMembers.call(this);
+    this._dynamicElementRankModifiers = {}; // { elementId: modifier(整数) }
+  };
+
+  // 戦闘開始時に動的変化をリセット
+  const _Game_Battler_onBattleStart = Game_Battler.prototype.onBattleStart;
+  Game_Battler.prototype.onBattleStart = function () {
+    _Game_Battler_onBattleStart.call(this);
+    this._dynamicElementRankModifiers = {};
+  };
+
+  // --- 3. 現在の最終的な耐性レベル（インデックス）を計算する関数 ---
+  Game_BattlerBase.prototype.getCurrentElementRankIndex = function (elementId) {
+    // ① まずベース（メモ欄など）のランクを取得
+    let baseRankKey = "normal";
+
+    // 特徴オブジェクト（アクター・職業・装備・ステート）のメモ欄を走査
+    for (const obj of this.traitObjects()) {
+      if (obj && obj.note) {
+        const tagPattern = new RegExp(`<element_rank\\[${elementId}\\]:\\s*([^>]+)>`);
+        const match = obj.note.match(tagPattern);
+        if (match) {
+          baseRankKey = match[1].trim();
+          break; // 最初に見つかったものを優先
+        }
+      }
     }
 
-    // 通常を挿入
-    RANK_ORDER.push("normal");
-
-    // ② 通常(normal) と 即死(death) の間の弱点段階を挿入
-    if (params.WeakRanks) {
-        try {
-            JSON.parse(params.WeakRanks).forEach(itemStr => {
-                const item = JSON.parse(itemStr);
-                if (item.key) {
-                    RANK_ORDER.push(item.key);
-                    RANK_RATES[item.key] = Number(item.rate || 1.5);
-                }
-            });
-        } catch (e) { console.error(e); }
+    // RANK_ORDER 上の現在の位置（インデックス）を取得
+    let rankIndex = RANK_ORDER.indexOf(baseRankKey);
+    if (rankIndex === -1) {
+      rankIndex = RANK_ORDER.indexOf("normal"); // 見つからなければ通常
     }
 
-    // 最後に即死を挿入
-    RANK_ORDER.push("death");
+    // ② スキルによる変動量を加算
+    const modifier = this._dynamicElementRankModifiers[elementId] || 0;
+    rankIndex += modifier;
 
-    // デバッグ用に最終的な配列構造をコンソールに出力
-    console.log("【耐性段階システム】構築された耐性ライン:", RANK_ORDER);
-    console.log("【耐性段階システム】各段階の倍率:", RANK_RATES);
+    // 配列の範囲内（最左翼の吸収 ～ 最右翼の即死）に収める
+    return Math.max(0, Math.min(RANK_ORDER.length - 1, rankIndex));
+  };
 
+  // --- 4. 属性有効度のオーバーライド ---
+  const _Game_BattlerBase_elementRate = Game_BattlerBase.prototype.elementRate;
+  Game_BattlerBase.prototype.elementRate = function (elementId) {
+    const rankIndex = this.getCurrentElementRankIndex(elementId);
+    const rankKey = RANK_ORDER[rankIndex];
 
-    // --- 2. バトラーに一時的な耐性変動値を保存する領域を作る ---
-    const _Game_BattlerBase_initMembers = Game_BattlerBase.prototype.initMembers;
-    Game_BattlerBase.prototype.initMembers = function() {
-        _Game_BattlerBase_initMembers.call(this);
-        this._dynamicElementRankModifiers = {}; // { elementId: modifier(整数) }
-    };
+    if (RANK_RATES[rankKey] !== undefined) {
+      return RANK_RATES[rankKey];
+    }
+    return _Game_BattlerBase_elementRate.call(this, elementId);
+  };
 
-    // 戦闘開始時に動的変化をリセット
-    const _Game_Battler_onBattleStart = Game_Battler.prototype.onBattleStart;
-    Game_Battler.prototype.onBattleStart = function() {
-        _Game_Battler_onBattleStart.call(this);
-        this._dynamicElementRankModifiers = {};
-    };
+  // --- 5. ダメージ計算時に「即死(death)」状態なら即死させる処理 ---
+  const _Game_Battler_onDamage = Game_Battler.prototype.onDamage;
+  Game_Battler.prototype.onDamage = function (value) {
+    _Game_Battler_onDamage.call(this, value);
 
+    // 戦闘中のダメージ処理である場合
+    if ($gameParty.inBattle()) {
+      const action = BattleManager._action;
+      if (action && action.item()) {
+        const elementId = action.item().damage.elementId;
+        // 通常攻撃（elementId === -1）の場合は、攻撃側の属性を取得
+        const actualElementId = elementId === -1 ? action.subject().attackElements()[0] : elementId;
 
-    // --- 3. 現在の最終的な耐性レベル（インデックス）を計算する関数 ---
-    Game_BattlerBase.prototype.getCurrentElementRankIndex = function(elementId) {
-        // ① まずベース（メモ欄など）のランクを取得
-        let baseRankKey = "normal";
-        
-        // 特徴オブジェクト（アクター・職業・装備・ステート）のメモ欄を走査
-        for (const obj of this.traitObjects()) {
-            if (obj && obj.note) {
-                const tagPattern = new RegExp(`<element_rank\\[${elementId}\\]:\\s*([^>]+)>`);
-                const match = obj.note.match(tagPattern);
-                if (match) {
-                    baseRankKey = match[1].trim();
-                    break; // 最初に見つかったものを優先
-                }
-            }
+        if (actualElementId > 0) {
+          const rankIndex = this.getCurrentElementRankIndex(actualElementId);
+          if (RANK_ORDER[rankIndex] === "death" && value > 0) {
+            // 耐性が「death（即死）」かつダメージが1以上通った場合、戦闘不能を付加
+            this.addState(this.deathStateId());
+            BattleManager._logWindow.push("addText", `${this.name()}は弱点属性が限界を迎え即死した！`);
+          }
         }
+      }
+    }
+  };
 
-        // RANK_ORDER 上の現在の位置（インデックス）を取得
-        let rankIndex = RANK_ORDER.indexOf(baseRankKey);
-        if (rankIndex === -1) {
-            rankIndex = RANK_ORDER.indexOf("normal"); // 見つからなければ通常
+  // --- 6. プラグインコマンドの登録 ---
+  PluginManager.registerCommand(pluginName, "ChangeElementRank", (args) => {
+    const targetType = args.targetType;
+    const elementId = Number(args.elementId);
+    const amount = Number(args.amount);
+
+    let targets = [];
+    if (targetType === "lastTarget") {
+      targets = BattleManager._targets || [];
+    } else if (targetType === "user") {
+      if (BattleManager._action) {
+        targets = [BattleManager._action.subject()];
+      }
+    }
+
+    targets.forEach((battler) => {
+      if (battler && battler._dynamicElementRankModifiers) {
+        if (!battler._dynamicElementRankModifiers[elementId]) {
+          battler._dynamicElementRankModifiers[elementId] = 0;
         }
+        battler._dynamicElementRankModifiers[elementId] += amount;
 
-        // ② スキルによる変動量を加算
-        const modifier = this._dynamicElementRankModifiers[elementId] || 0;
-        rankIndex += modifier;
-
-        // 配列の範囲内（最左翼の吸収 ～ 最右翼の即死）に収める
-        return Math.max(0, Math.min(RANK_ORDER.length - 1, rankIndex));
-    };
-
-
-    // --- 4. 属性有効度のオーバーライド ---
-    const _Game_BattlerBase_elementRate = Game_BattlerBase.prototype.elementRate;
-    Game_BattlerBase.prototype.elementRate = function(elementId) {
-        const rankIndex = this.getCurrentElementRankIndex(elementId);
-        const rankKey = RANK_ORDER[rankIndex];
-        
-        if (RANK_RATES[rankKey] !== undefined) {
-            return RANK_RATES[rankKey];
-        }
-        return _Game_BattlerBase_elementRate.call(this, elementId);
-    };
-
-
-    // --- 5. ダメージ計算時に「即死(death)」状態なら即死させる処理 ---
-    const _Game_Battler_onDamage = Game_Battler.prototype.onDamage;
-    Game_Battler.prototype.onDamage = function(value) {
-        _Game_Battler_onDamage.call(this, value);
-        
-        // 戦闘中のダメージ処理である場合
-        if ($gameParty.inBattle()) {
-            const action = BattleManager._action;
-            if (action && action.item()) {
-                const elementId = action.item().damage.elementId;
-                // 通常攻撃（elementId === -1）の場合は、攻撃側の属性を取得
-                const actualElementId = elementId === -1 ? action.subject().attackElements()[0] : elementId;
-
-                if (actualElementId > 0) {
-                    const rankIndex = this.getCurrentElementRankIndex(actualElementId);
-                    if (RANK_ORDER[rankIndex] === "death" && value > 0) {
-                        // 耐性が「death（即死）」かつダメージが1以上通った場合、戦闘不能を付加
-                        this.addState(this.deathStateId());
-                        BattleManager._logWindow.push("addText", `${this.name()}は弱点属性が限界を迎え即死した！`);
-                    }
-                }
-            }
-        }
-    };
-
-
-    // --- 6. プラグインコマンドの登録 ---
-    PluginManager.registerCommand(pluginName, "ChangeElementRank", args => {
-        const targetType = args.targetType;
-        const elementId = Number(args.elementId);
-        const amount = Number(args.amount);
-
-        let targets = [];
-        if (targetType === "lastTarget") {
-            targets = BattleManager._targets || [];
-        } else if (targetType === "user") {
-            if (BattleManager._action) {
-                targets = [BattleManager._action.subject()];
-            }
-        }
-
-        targets.forEach(battler => {
-            if (battler && battler._dynamicElementRankModifiers) {
-                if (!battler._dynamicElementRankModifiers[elementId]) {
-                    battler._dynamicElementRankModifiers[elementId] = 0;
-                }
-                battler._dynamicElementRankModifiers[elementId] += amount;
-                
-                // デバッグログ用（F8キーのコンソールで確認可能）
-                const rankIndex = battler.getCurrentElementRankIndex(elementId);
-                console.log(`${battler.name()} の属性 ${elementId} の現在の耐性段階: ${RANK_ORDER[rankIndex]} (倍率: ${RANK_RATES[RANK_ORDER[rankIndex]]})`);
-            }
-        });
+        // デバッグログ用（F8キーのコンソールで確認可能）
+        const rankIndex = battler.getCurrentElementRankIndex(elementId);
+        console.log(
+          `${battler.name()} の属性 ${elementId} の現在の耐性段階: ${RANK_ORDER[rankIndex]} (倍率: ${RANK_RATES[RANK_ORDER[rankIndex]]})`,
+        );
+      }
     });
-
+  });
 })();
