@@ -1,4 +1,4 @@
-/// <reference path="./T_PluginBase.d.ts" />
+/// <reference path="../types/T_PluginBase.d.ts" />
 
 //=============================================================================
 // RPG Maker MZ - T_PluginBase

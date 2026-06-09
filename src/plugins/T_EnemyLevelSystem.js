@@ -1,4 +1,4 @@
-/// <reference path="./T_EnemyLevelSystem.d.ts" />
+/// <reference path="../types/T_EnemyLevelSystem.d.ts" />
 
 //=============================================================================
 // RPG Maker MZ - T_EnemyLevelSystem
@@ -90,7 +90,7 @@
  * 　     --> ID「4」のステートが付与されているときに優先度1でID「ZZ」のスキ
  * 　         ルを行動する
  *
- * ### マップ
+ * ## マップ
  * 出現する敵キャラのレベルをメモに設定します．
  *
  * <levelSync>
@@ -172,17 +172,18 @@ TELS.readParams = (script) => {
   // --------------------------------------------------------------------------
   // Game_Enemy
   // --------------------------------------------------------------------------
-  // Object.defineProperty(Game_Enemy.prototype, "_level", {
-  //   get: function () {
-  //     return this.getCurrentLevel();
-  //   },
-  //   configurable: true,
-  // });
+  Object.defineProperty(Game_Enemy.prototype, "classId", {
+    get: function () {
+      if (!this._classId) this.setupClassId();
+
+      return this._classId;
+    },
+    configurable: true,
+  });
   Object.defineProperty(Game_Enemy.prototype, "level", {
     get: function () {
-      if (!this._level) {
-        this._level = this.getCurrentLevel();
-      }
+      if (!this._level) this._level = this.getCurrentLevel();
+
       return this._level;
     },
     configurable: true,
@@ -198,33 +199,33 @@ TELS.readParams = (script) => {
   const _Game_Enemy_setup = Game_Enemy.prototype.setup;
   Game_Enemy.prototype.setup = function (enemyId, x, y) {
     _Game_Enemy_setup.apply(this, arguments);
-    this._classId = this.setupClassId();
+    this.setupClassId();
   };
 
   /**
+   * 現在の職業を取得する
    *
-   * @returns {rm.types.RPGClass}
+   * @see Game_Actor.prototype.currentClass
    */
   Game_Enemy.prototype.currentClass = function () {
+    // アクターと同じ方法で取得
     const cls = Game_Actor.prototype.currentClass.call(this);
 
     return cls;
   };
 
   /**
-   *
-   * @returns {number}
+   * 現在の職業の ID を取得する
    */
   Game_Enemy.prototype.setupClassId = function () {
     const metaClassId = this.enemy().meta.classId;
     const classId = metaClassId === undefined ? undefined : Number(metaClassId);
 
-    return Number.isNaN(classId) ? this._classId : classId;
+    if (!Number.isNaN(classId)) this._classId = classId;
   };
 
   /**
-   *
-   * @returns {number}
+   * 現在のレベルを取得する
    */
   Game_Enemy.prototype.getCurrentLevel = function () {
     let level = 1,
@@ -276,9 +277,9 @@ TELS.readParams = (script) => {
    * @returns
    */
   Game_Enemy.prototype.paramBase = function (paramId) {
-    if (this._classId) {
+    if (this.classId) {
       // クラス指定あり
-      const classData = $dataClasses[this._classId];
+      const classData = $dataClasses[this.classId];
       if (classData && classData.params) {
         return classData.params[paramId][this.level];
       }
@@ -295,7 +296,7 @@ TELS.readParams = (script) => {
    * @returns {number}
    */
   Game_Enemy.prototype.customParamBase = function (cparam) {
-    if (this._classId) {
+    if (this.classId) {
       // クラス指定あり
       const value = Game_Actor.prototype.customParamBase.call(this, cparam);
       return value;
@@ -332,6 +333,7 @@ TELS.readParams = (script) => {
 
   Game_Enemy.prototype.makeActions = function () {
     Game_Battler.prototype.makeActions.call(this);
+
     if (this.numActions() > 0) {
       const enemy = this.enemy();
       //

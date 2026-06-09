@@ -13,10 +13,11 @@ declare namespace TELS {
 
 interface Game_Enemy {
   _classId: number;
+  classId: number;
   _level: number;
   level: number;
 
   currentClass: () => rm.types.RPGClass;
-  setupClassId: () => number;
+  setupClassId: () => void;
   getCurrentLevel: () => number;
 }

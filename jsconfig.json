@@ -7,6 +7,6 @@
     "src/plugins/*.js",
     "lunalite-pixi-mz.d.ts",
     "custom.d.ts",
-    "src/plugins/T_PluginBase.d.ts"
+    "src/types/T_PluginBase.d.ts"
   ]
 }

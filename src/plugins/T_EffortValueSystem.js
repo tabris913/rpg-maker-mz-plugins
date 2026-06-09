@@ -1,4 +1,4 @@
-/// <reference path="./T_EffortValueSystem.d.ts" />
+/// <reference path="../types/T_EffortValueSystem.d.ts" />
 
 //=============================================================================
 // RPG Maker MZ - T_EffortValueSystem.js
@@ -17,13 +17,11 @@
  *   @desc 何ポイント溜まると能力値が 1 上がるかを設定する
  *   @type number
  *   @default 4
- *
  * @param TotalMax
  *   @text 合計上限
  *   @desc アクターが獲得できる合計努力値の上限を設定する
  *   @type number
  *   @default 510
- *
  * @param IndividualMax
  *   @text 個別上限
  *   @desc アクターが獲得できる各能力値ごとの努力値の上限を設定する
@@ -35,7 +33,50 @@
  * T_EffortValueSystem.js [ja] v1.0.0
  * ================================
  *
+ * # Dependencies
+ *
+ * - PluginCommonBase.js
+ * 　> {RPG Maker MZ のインストール場所}/dlc/BasicResources/plugins/official
+ * 　> にあるものを，ゲームプロジェクトのプラグインディレクトリにコピーし，
+ * 　> プラグイン管理から有効化してください
+ * - T_PluginBase.js
+ * 　> ゲームプロジェクトのプラグインディレクトリにコピーし，プラグイン管理から
+ * 　> 有効化してください
+ *
+ * # できること
+ *
+ * - 敵キャラを倒すと努力値を獲得できます
+ * - 努力値を何ポイント溜めるとステータスが1上昇するかを変更する
+ * - 獲得努力値の上限量を変更する
+ *
+ * # ⚠️注意点⚠️
  * 確率能力値には反映されない
+ *
+ * # 設定方法
+ * ## データベース
+ * ### 敵キャラ
+ *
+ * <ev_{paramKey}: {value}>
+ * 　倒したときに得られる努力値の種類と量を設定します．{paramKey}にはスキルの計
+ * 　算式で指定する能力値のキーを指定します．T_CustomParametersを導入している
+ * 　場合は，独自能力値のキーも設定できます．
+ * 　e.g. <ev_mhp: 2>
+ * 　     --> 最大HPの努力値が2得られる．
+ *
+ * ### アイテム
+ *
+ * <evResetAll>
+ * 　すべての努力値をリセットするように設定する．
+ *
+ * <evReset_{paramKey}>
+ * 　特定の能力値の努力値をリセットするように設定する．
+ * 　e.g. <evReset_mhp>
+ * 　     --> 最大HPの努力値をリセットする．
+ *
+ * <evAdd_{paramKey}: {value}>
+ * 　特定の努力値を変化させるように設定する．
+ * 　e.g. <evAdd_mhp: -10>
+ * 　     --> 最大HPの努力値を10下げる．
  *
  * ================
  * Version History

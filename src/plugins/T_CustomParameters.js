@@ -1,4 +1,4 @@
-/// <reference path="./T_CustomParameters.d.ts" />
+/// <reference path="../types/T_CustomParameters.d.ts" />
 
 //=============================================================================
 // RPG Maker MZ - T_CustomParameters
@@ -433,6 +433,8 @@
  * Version History
  * ================
  * Ver.   Date        Desc.
+ * 1.1.0  2026/06/??  レベルアップで独自能力値がアップする仕組みを導入
+ * 　                 会心ダメージの倍率変更を導入
  * 1.0.0  2026/05/29  初版
  */
 
@@ -960,6 +962,11 @@ const setCustomParams = () => {
   // --------------------------------------------------------------------------
   // Game_Action
   // --------------------------------------------------------------------------
+  /**
+   *
+   * @param {Game_Battler} target
+   * @override
+   */
   Game_Action.prototype.apply = function (target) {
     const result = target.result();
     this.subject().clearResult();
@@ -1000,7 +1007,6 @@ const setCustomParams = () => {
   /**
    *
    * @param {number} damage
-   * @returns
    * @override
    */
   Game_Action.prototype.applyCritical = function (damage) {

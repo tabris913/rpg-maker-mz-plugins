@@ -1,4 +1,4 @@
-/// <reference path="./T_ElementRankSystem.d.ts" />
+/// <reference path="../types/T_ElementRankSystem.d.ts" />
 
 //=============================================================================
 // RPG Maker MZ - T_ElementRankSystem
@@ -6,7 +6,7 @@
 
 /*:
  * @target MZ
- * @plugindesc 動的に属性耐性レベルを上下させるシステムを導入するプラグイン
+ * @plugindesc 動的に属性有効度レベルを上下させるシステムを導入するプラグイン
  * @author tosshie
  * @base PluginCommonBase
  * @orderAfter PluginCommonBase
@@ -18,25 +18,21 @@
  *   @desc 無効(倍率0倍)と通常(倍率1倍)の間の耐性段階を定義する
  *   @type struct<CustomRank>[]
  *   @default ["{\"key\":\"halve\",\"name\":\"半減\",\"rate\":\"0.5\"}"]
- *
  * @param WeakRanks
  *   @text 弱点段階
  *   @desc 通常(倍率1倍)と即死(倍率+∞)の間の弱点段階を定義する
  *   @type struct<CustomRank>[]
  *   @default ["{\"key\":\"weak\",\"name\":\"弱点\",\"rate\":\"1.5\"}"]
- *
  * @param NormalRankName
  *   @text 通常段階名
  *   @desc 倍率1倍の段階の表示名を定義する
  *   @type string
  *   @default 通常
- *
  * @param AbsorbRank
  *   @text 吸収段階
  *   @desc ダメージを吸収する段階を定義する
  *   @type struct<AbsorbRank>
  *   @default {"rate":"-1","isEnabled":"true"}
- *
  * @param InstantDeathRank
  *   @text 即死段階
  *   @desc 一撃必殺の段階を定義する
@@ -48,13 +44,86 @@
  * T_ElementRankSystem.js [ja] v0.0.1
  * ================================
  *
+ * # Dependencies
+ *
+ * - PluginCommonBase.js
+ * 　> {RPG Maker MZ のインストール場所}/dlc/BasicResources/plugins/official
+ * 　> にあるものを，ゲームプロジェクトのプラグインディレクトリにコピーし，
+ * 　> プラグイン管理から有効化してください
+ * - T_PluginBase.js
+ * 　> ゲームプロジェクトのプラグインディレクトリにコピーし，プラグイン管理から
+ * 　> 有効化してください
+ *
+ * # できること
+ *
  * - 従来の属性有効度の設定はすべて無視されます
+ *
+ * # 設定方法
+ * ## プラグイン設定
+ * ### 耐性段階・弱点段階
+ * 「吸収」「無効」「通常」「即死」以外の耐性・弱点の設定を行います．
+ *
+ * ### 通常段階名
+ * 通常状態(等倍)の表示名を変更します．
+ *
+ * ### 吸収段階・即死段階
+ * 属性を吸収する耐性段階および即死する弱点段階の有効・無効を切り替えます．
+ *
+ * ## データベース
+ * ### アクター・職業・敵キャラ
+ * アクター・職業・敵キャラの固有の有効度段階を設定します．
+ *
+ * <elementRank_{elementId}: {value}>
+ * 　属性ごとに通常状態から何段階変化した状態であるかを設定します．正の数を設定
+ * 　した場合は弱点方向に，負の数を設定した場合は耐性方向に変化します．また，数
+ * 　値ではなくキーワードを設定することも可能です．
+ * 　キーワード: absorb(吸収), null(無効), instantDeath(即死)
+ * 　e.g. <elementRank_1: 2>
+ * 　     --> ID「1」の属性有効度が通常状態よりも2段階上昇している．
+ * 　e.g. <elementRank_1: absorb>
+ * 　     --> ID「1」の属性有効度が「吸収」段階になる．
+ *
+ * 　アクターと職業に，T_EnemyLevelSystemを導入している場合は敵キャラと職業に
+ * 　もそれぞれ設定をすることができますが，これらは基本的に加算されます．数値に
+ * 　!記号を付与することで，加算されずに一方の値を強制することができます．両者に
+ * 　!記号がある場合は，職業が優先されます．
+ * 　e.g. <elementRank_1: -1> (アクター)
+ * 　     <elementRank_1: 2> (職業)
+ * 　     --> ID「1」の属性有効度が通常状態よりも1段階上昇している．
+ * 　e.g. <elementRank_1: -1!> (アクター)
+ * 　     <elementRank_1: 2> (職業)
+ * 　     --> ID「1」の属性有効度が通常状態よりも1段階下降している．
+ * 　e.g. <elementRank_1: -1!> (アクター)
+ * 　     <elementRank_1: 2!> (職業)
+ * 　     --> ID「1」の属性有効度が通常状態よりも2段階上昇している．
+ *
+ * ### スキル・アイテム
+ * スキル・アイテムを使用した際の耐性段階の変化を設定します．
+ *
+ * <elementRank_{elementId}: {value},{turn}>
+ * 　属性有効度が何ターンの間，何段階変化するかを設定します．
+ * 　e.g. <elementRank_1: 1,2>
+ * 　     --> ID「1」の属性有効度が，2ターンの間通常状態よりも1段階上昇する．
+ *
+ * ### 武器・防具・ステート
+ * 武器・防具を装備した際およびステートが付与されている際の設定をします．その他
+ * の設定と異なり，有効度段階ではなく直接倍率を設定します．
+ *
+ * <addElementRate_{elementId}: {value}>
+ * 　属性耐性に対する加算効果を設定します．
+ * 　e.g. <addElementRate_1: 0.2>
+ * 　     --> ID「1」の属性倍率に0.2加算する (20%増加)
+ *
+ * <prodElementRate_{elementId}: {value}>
+ * 　属性耐性に対する乗算効果を設定します．
+ * 　e.g. <prodElementRate_1: 1.5>
+ *        --> ID「1」の属性倍率が1.5倍になる
  *
  * ================
  * Version History
  * ================
  * Ver.   Date        Desc.
- * 0.0.1  yyyy/MM/dd  初版作成
+ * 1.0.0  2026/06/dd  初版作成
  */
 
 /*~struct~CustomRank:
@@ -62,12 +131,10 @@
  *   @text 属性有効段階キー
  *   @desc
  *   @type string
- *
  * @param name
  *   @text 属性有効段階名
  *   @desc
  *   @type string
- *
  * @param rate
  *   @text 倍率
  *   @desc 属性有効度を指定する
@@ -80,7 +147,6 @@
  *   @desc 属性有効度を指定する
  *   @type string
  *   @default -1
- *
  * @param isEnabled
  *   @text 有効
  *   @desc 属性有効度を指定する
@@ -94,7 +160,6 @@
  *   @text 属性有効段階名
  *   @desc
  *   @type string
- *
  * @param isEnabled
  *   @text 有効
  *   @desc 属性有効度を指定する

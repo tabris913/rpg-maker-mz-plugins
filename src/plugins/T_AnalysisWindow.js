@@ -1,4 +1,4 @@
-/// <reference path="./T_AnalysisWindow.d.ts" />
+/// <reference path="../types/T_AnalysisWindow.d.ts" />
 
 //=============================================================================
 // RPG Maker MZ - T_AnalysisWindow
