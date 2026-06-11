@@ -384,6 +384,12 @@ TELS.readParams = (script) => {
     this.setActionState("waiting");
   };
 
+  const _Game_Enemy_traitObjects = Game_Enemy.prototype.traitObjects;
+  Game_Enemy.prototype.traitObjects = function () {
+    // 敵キャラに適用される特徴に，職業の特徴を追加
+    return _Game_Enemy_traitObjects.call(this).concat(this.currentClass());
+  };
+
   // -------------------------------------------------------------------------------------------------------------------
   // Windows
   // -------------------------------------------------------------------------------------------------------------------

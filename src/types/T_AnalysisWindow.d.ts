@@ -1,4 +1,6 @@
-declare const TAW: {};
+declare const TAW: {
+  isEnableTCP: boolean;
+};
 
 interface Scene_Battle {
   createAnalysisToggleWindow: () => void;

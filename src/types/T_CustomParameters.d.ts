@@ -3,7 +3,7 @@ declare const TCP: {
   buffRate: number;
   paramMemo: Record<number, Record<string, Record<number, number>>>;
   presentValues: { HP: boolean; MP: boolean };
-  criticalDamageRate: number;
+  criticalDamageRate: TCP.CriticalDamageDef;
 };
 
 declare namespace TCP {
@@ -61,6 +61,7 @@ declare namespace TCP {
        */
       formula: Array<string>;
     }>;
+  type CriticalDamageInput = BuiltInParam1Input & { default?: number };
   type ParamType = "param" | "xparam" | "sparam" | "cparam";
   type BuiltInParam = {
     key: string;
@@ -90,6 +91,13 @@ declare namespace TCP {
     type: ParamType;
   };
   type ParamsDef = BuiltInParam & Cparam;
+  type CriticalDamageDef = {
+    default: number;
+    maxBuff: number;
+    maxDebuff: number;
+    visible: boolean;
+    displayOrder?: number;
+  };
 
   type RawParams = Record<
     | "MaximumHitPoints"
@@ -126,7 +134,7 @@ declare namespace TCP {
     MagicPoints: boolean;
     ParamJson: Array<CustomParamInput>;
     buffRate: number;
-    criticalDamageRate: string;
+    criticalDamageRate: CriticalDamageInput;
   };
   type BuiltInParams = Record<
     | "maximumHitPoints"
@@ -159,30 +167,78 @@ declare namespace TCP {
     | "experienceRate",
     BuiltInParam
   >;
+
+  type CustomEffect = { code: "buff" | "debuff"; key: string; value?: number; turns: number };
+}
+
+interface Game_Action {
+  applyItemCustomBuffEffect: (target: Game_Battler, effect: TCP.CustomEffect) => void;
+  itemEffectAddCustomBuff: (target: Game_Battler, effect: TCP.CustomEffect) => void;
+  itemEffectAddCustomDebuff: (target: Game_Battler, effect: TCP.CustomEffect) => void;
 }
 
 interface Game_ActionResult {
-  isCustomBuffAdded: (cparamId: number) => boolean;
-  pushAddedCustomBuff: (cparamId: number) => void;
-  isCustomDebuffAdded: (cparamId: number) => boolean;
-  pushAddedCustomDebuff: (cparamId: number) => void;
-  isCustomBuffRemoved: (cparamId: number) => boolean;
-  pushRemovedCustomBuff: (cparamId: number) => boolean;
+  addedCustomBuffs: Array<string>;
+  addedCustomDebuffs: Array<string>;
+  removedCustomBuffs: Array<string>;
+
+  isCustomBuffAdded: (paramKey: string) => boolean;
+  pushAddedCustomBuff: (paramKey: string) => void;
+  isCustomDebuffAdded: (paramKey: string) => boolean;
+  pushAddedCustomDebuff: (paramKey: string) => void;
+  isCustomBuffRemoved: (paramKey: string) => boolean;
+  pushRemovedCustomBuff: (paramKey: string) => boolean;
 }
 
 interface Game_BattlerBase {
-  eraseCustomBuff: (cparamId: number) => void;
-  customBuffLength: () => number;
-  customBuff: (cparamId: number) => number;
-  isCustomBuffAffected: (cparamId: number) => boolean;
-  isCustomDebuffAffected: (cparamId: number) => boolean;
-  isCustomBuffOrDebuffAffected: (cparamId: number) => boolean;
-  isMaxCustomBuffAffected: (cparamId: number) => boolean;
-  isMaxCustomDebuffAffected: (cparamId: number) => boolean;
-  increaseCustomBuff: (cparamId: number) => void;
-  decreaseCustomBuff: (cparamId: number) => void;
-  overwriteCustomBuffTurns: (cparamId: number, turns: number) => void;
-  isCustomBuffExpired: (cparamId: number) => boolean;
+  _xparamPlus: Array<number>;
+  _sparamPlus: Array<number>;
+  _cparamPlus: Array<number>;
+  _crdPlus: number;
+
+  _xbuffs: Array<number>;
+  _sbuffs: Array<number>;
+  _cbuffs: Array<number>;
+  _crdBuff: number;
+
+  _xbuffTurns: Array<number>;
+  _sbuffTurns: Array<number>;
+  _cbuffTurns: Array<number>;
+  _crdBuffTurns: number;
+
+  eraseCustomBuff: (paramKey: string, param?: TCP.ParamsDef) => void;
+  xbuffLength: () => number;
+  sbuffLength: () => number;
+  cbuffLength: () => number;
+  customBuff: (paramKey: string, param?: TCP.ParamsDef) => number;
+  isCustomBuffAffected: (paramKey: string, param?: TCP.ParamsDef) => boolean;
+  isCustomDebuffAffected: (paramKey: string, param?: TCP.ParamsDef) => boolean;
+  isCustomBuffOrDebuffAffected: (paramKey: string, param?: TCP.ParamsDef) => boolean;
+  isMaxCustomBuffAffected: (paramKey: string, param?: TCP.ParamsDef) => boolean;
+  isMaxCustomDebuffAffected: (paramKey: string, param?: TCP.ParamsDef) => boolean;
+  increaseCustomBuff: (paramKey: string, value: number, param?: TCP.ParamsDef) => void;
+  decreaseCustomBuff: (paramKey: string, value: number, param?: TCP.ParamsDef) => void;
+  overwriteCustomBuffTurns: (paramKey: string, param?: TCP.ParamsDef, turns: number) => void;
+  isCustomBuffExpired: (paramKey: string, param?: TCP.ParamsDef) => boolean;
+  customDebuffRate: (paramKey: string) => number;
+
+  xparamBase: (xparamId: number) => number;
+  xparamPlus: (xparamId: number) => number;
+  xparamBasePlus: (xparamId: number) => number;
+  xparamRate: (xparamId: number) => number;
+  xparamBuffRate: (xparamId: number) => number;
+  sparamBase: (sparamId: number) => number;
+  sparamPlus: (sparamId: number) => number;
+  sparamBasePlus: (sparamId: number) => number;
+  sparamRate: (sparamId: number) => number;
+  sparamBuffRate: (sparamId: number) => number;
+  crdBase: () => number;
+  crdPlus: () => number;
+  crdBasePlus: () => number;
+  crdRate: () => number;
+  crdBuffRate: () => number;
+  crd: () => number;
+  addCrd: (value: number) => void;
 
   customParamBase: (param: Cparam) => number;
   customParamPlus: (param: Cparam) => number;
@@ -194,7 +250,7 @@ interface Game_BattlerBase {
 }
 
 interface Game_Battler {
-  addCustomBuff: (cparamId: number, turns: number) => void;
-  addCustomDebuff: (cparamId: number, turns: number) => void;
-  removeCustomBuff: (cparamId: number) => void;
+  addCustomBuff: (paramKey: string, param?: TCP.ParamsDef, turns: number, value?: number) => void;
+  addCustomDebuff: (paramKey: string, param?: TCP.ParamsDef, turns: number, value?: number) => void;
+  removeCustomBuff: (paramKey: string, param?: TCP.ParamsDef) => void;
 }

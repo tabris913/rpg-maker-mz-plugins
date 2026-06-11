@@ -203,8 +203,8 @@
  * @param criticalDamageRate
  *   @text 会心ダメージ率
  *   @desc
- *   @type string
- *   @default 3
+ *   @type struct<CriticalDamageDef>
+ *   @default {"default":"3","maxBuff":"0","maxDebuff":"0","visible":"false","displayOrder":"26"}
  *
  * @help
  * ================================
@@ -228,12 +228,16 @@
  * - 別の能力値の値を合算した能力値を作成する
  * - 命中率や回避率のような隠し能力値をステータス欄に表示させる
  * - 能力値の表示順を変更する
+ * - 追加能力値・特殊能力値にもバフを適用する
  * - バフ/デバフ1段階あたりの変化率を変更する
  * - 会心ダメージの倍率を変更する
  *
  * # ⚠️注意点⚠️
  *
- * 能力値表示を変更するプラグインと競合する可能性があります
+ * - 能力値表示を変更するプラグインと競合する可能性があります
+ * - スキルやアイテムなど，使用して効果を発揮するものの場合，メモ欄に設定を記載
+ * 　するだけでは効果が出ません．「TP 0回復」のようなダミーの使用効果をつけてく
+ * 　ださい．
  *
  * # 設定方法
  * ## プラグイン設定
@@ -358,6 +362,26 @@
  * 　能力値に補正をかけます．
  * 　e.g. <prod_dex: 1.5>
  * 　     --> ステートが付くと器用さが1.5倍になります
+ *
+ * ### バフ・デバフ設定
+ * スキル・アイテム・武器・防具のメモ欄に与えるバフ・デバフを設定します．デフォ
+ * ルトでは1段階しか付与できないため，通常能力値の場合でも2段階以上変化させたい
+ * 場合は，同様に設定すれば機能します．
+ *
+ * <buff_{key}: {value},{turns}>
+ * <debuff_{key}: {value},{turns}>
+ * 　e.g. <buff_atk: 1,2>
+ * 　     --> 2ターンの間，攻撃力に1段階バフを付与する
+ * 　e.g. <debuff_def: 1,2>
+ * 　     --> 2ターンの間，防御力に1段階デバフを付与する
+ *
+ * ### デバフ耐性
+ * アクター・敵キャラ・職業・武器・防具・ステートのメモ欄にデバフ耐性を設定しま
+ * す．
+ *
+ * <debuffRate_{key}: {value}>
+ * 　e.g. <debuffRate_mhp: 0.5>
+ * 　     --> 最大HPに対するデバフが効く確率を0.5倍する (累積)
  *
  * # つかいかた(例)
  *
@@ -559,6 +583,36 @@
  *   @desc
  *   @type number
  *   @default 100
+ */
+// 会心ダメージ率
+/*~struct~CriticalDamageDef:
+ * @param default
+ *   @text デフォルト倍率
+ *   @desc
+ *   @type number
+ *   @default 3
+ * @param maxBuff
+ *   @text 最大のバフ段階
+ *   @desc
+ *   @type number
+ *   @default 0
+ * @param maxDebuff
+ *   @text 最大のデバフ段階
+ *   @desc
+ *   @type number
+ *   @default 0
+ * @param visible
+ *   @text 表示/非表示
+ *   @desc
+ *   @type boolean
+ *   @on 表示
+ *   @off 非表示
+ *   @default false
+ * @param displayOrder
+ *   @text 表示順
+ *   @desc
+ *   @type number
+ *   @default 26
  */
 
 /**
@@ -834,7 +888,7 @@ TCP.readParams = (script) => {
     key: tp.key || `key_${index}`,
     name: tp.name || `パラメータ${index}`,
     min: PluginParamParser.number(tp.min, 0),
-    max: PluginParamParser.number(tp.isRate ? 1 : tp.max),
+    max: PluginParamParser.number(tp.max, Infinity),
     maxBuff: PluginParamParser.number(tp.maxBuff, 2),
     maxDebuff: PluginParamParser.number(tp.maxDebuff, 2),
     isRate: PluginParamParser.boolean(tp.isRate, false),
@@ -883,7 +937,13 @@ TCP.readParams = (script) => {
   TCP.buffRate = params.buffRate ?? 0.25;
   TCP.paramMemo = {};
   TCP.presentValues = { HP: params.HitPoints, MP: params.MagicPoints };
-  TCP.criticalDamageRate = Number(params.criticalDamageRate) || 3;
+  TCP.criticalDamageRate = {
+    default: PluginParamParser.number(params.criticalDamageRate.default, 3),
+    maxBuff: PluginParamParser.number(params.criticalDamageRate.maxBuff, 0),
+    maxDebuff: PluginParamParser.number(params.criticalDamageRate.maxDebuff, 0),
+    visible: PluginParamParser.boolean(params.criticalDamageRate.visible, false),
+    displayOrder: PluginParamParser.number(params.criticalDamageRate.displayOrder, 26),
+  };
 };
 
 /**
@@ -986,16 +1046,37 @@ const setCustomParams = () => {
         this.applyItemEffect(target, effect);
       }
       //====================
-      // 独自能力値の加算効果
+      // 独自能力値の加算効果 (スキル・アイテム・武器・防具)
       const itemMeta = this.item().meta;
       Object.entries(itemMeta).forEach(([key, value]) => {
         if (key.startsWith("add_")) {
           const paramKey = key.replace("add_", "");
           const param = TCP.paramsDef.find((p) => p.key === paramKey);
           if (param) {
-            target.addCustomParam(param.paramId, Number(value));
+            target.addCustomParam(param.paramId, Number(value) || 0);
+            this.makeSuccess(target);
+          } else if (paramKey === "crd") {
+            target.addCrd(Number(value) || 0);
             this.makeSuccess(target);
           }
+        }
+        // 独自能力値のバフ
+        else if (key.startsWith("buff_")) {
+          const [value, turns] = value.split(",").map(Number);
+          this.applyItemCustomBuffEffect(target, {
+            code: "buff",
+            key: key.replace("buff_", ""),
+            value: value || 1,
+            turns: turns || 2,
+          });
+        } else if (key.startsWith("debuff_")) {
+          const [value, turns] = value.split(",").map(Number);
+          this.applyItemCustomBuffEffect(target, {
+            code: "debuff",
+            key: key.replace("debuff_", ""),
+            value: value || 1,
+            turns: turns || 2,
+          });
         }
       });
       //====================
@@ -1010,7 +1091,33 @@ const setCustomParams = () => {
    * @override
    */
   Game_Action.prototype.applyCritical = function (damage) {
-    return damage * TCP.criticalDamageRate;
+    return damage * (this.subject().crd?.() ?? TCP.criticalDamageRate.default);
+  };
+
+  /**
+   * 独自バフ効果を適用する
+   */
+  Game_Action.prototype.applyItemCustomBuffEffect = function (target, effect) {
+    switch (effect.code) {
+      case "buff":
+        this.itemEffectAddCustomBuff(target, effect);
+        break;
+      case "debuff":
+        this.itemEffectAddCustomDebuff(target, effect);
+    }
+  };
+
+  Game_Action.prototype.itemEffectAddCustomBuff = function (target, effect) {
+    target.addCustomBuff(effect.key, undefined, effect.turns, effect.value);
+    this.makeSuccess(target);
+  };
+
+  Game_Action.prototype.itemEffectAddCustomDebuff = function (target, effect) {
+    let chance = target.customDebuffRate(effect.key) * this.lukEffectRate(target);
+    if (Math.random() < chance) {
+      target.addCustomDebuff(effect.key, undefined, effect.turns, effect.value);
+      this.makeSuccess(target);
+    }
   };
 
   // --------------------------------------------------------------------------
@@ -1034,116 +1141,530 @@ const setCustomParams = () => {
     );
   };
 
-  Game_ActionResult.prototype.isCustomBuffAdded = function (cparamId) {
-    return this.addedCustomBuffs.includes(cparamId);
+  Game_ActionResult.prototype.isCustomBuffAdded = function (paramKey) {
+    return this.addedCustomBuffs.includes(paramKey);
   };
 
-  Game_ActionResult.prototype.pushAddedCustomBuff = function (cparamId) {
-    if (!this.isCustomBuffAdded(cparamId)) {
-      this.addedCustomBuffs.push(cparamId);
+  Game_ActionResult.prototype.pushAddedCustomBuff = function (paramKey) {
+    if (!this.isCustomBuffAdded(paramKey)) {
+      this.addedCustomBuffs.push(paramKey);
     }
   };
 
-  Game_ActionResult.prototype.isCustomDebuffAdded = function (cparamId) {
-    return this.addedCustomDebuffs.includes(cparamId);
+  Game_ActionResult.prototype.isCustomDebuffAdded = function (paramKey) {
+    return this.addedCustomDebuffs.includes(paramKey);
   };
 
-  Game_ActionResult.prototype.pushAddedCustomDebuff = function (cparamId) {
-    if (!this.isCustomDebuffAdded(cparamId)) {
-      this.addedCustomDebuffs.push(cparamId);
+  Game_ActionResult.prototype.pushAddedCustomDebuff = function (paramKey) {
+    if (!this.isCustomDebuffAdded(paramKey)) {
+      this.addedCustomDebuffs.push(paramKey);
     }
   };
 
-  Game_ActionResult.prototype.isCustomBuffRemoved = function (cparamId) {
-    return this.removedCustomBuffs.includes(cparamId);
+  Game_ActionResult.prototype.isCustomBuffRemoved = function (paramKey) {
+    return this.removedCustomBuffs.includes(paramKey);
   };
 
-  Game_ActionResult.prototype.pushRemovedCustomBuff = function (cparamId) {
-    if (!this.isCustomBuffRemoved(cparamId)) {
-      this.removedCustomBuffs.push(cparamId);
+  Game_ActionResult.prototype.pushRemovedCustomBuff = function (paramKey) {
+    if (!this.isCustomBuffRemoved(paramKey)) {
+      this.removedCustomBuffs.push(paramKey);
     }
   };
 
   // --------------------------------------------------------------------------
   // Game_BattlerBase
   // --------------------------------------------------------------------------
+  // 能力値加算値を初期化
   const _Game_BattlerBase_clearParamPlus = Game_BattlerBase.prototype.clearParamPlus;
   Game_BattlerBase.prototype.clearParamPlus = function () {
     _Game_BattlerBase_clearParamPlus.apply(this, arguments);
-    this._customParamPlus = Array(customParameters.length).fill(0);
+    this._xparamPlus = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    this._sparamPlus = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    // 独自能力値
+    this._cparamPlus = Array(customParameters.length).fill(0);
+    // 会心ダメージ率
+    this._crdPlus = 0;
   };
 
+  //===============================
+  // バフ
+
+  // 能力値バフを初期化
   const _Game_BattlerBase_clearBuffs = Game_BattlerBase.prototype.clearBuffs;
   Game_BattlerBase.prototype.clearBuffs = function () {
     _Game_BattlerBase_clearBuffs.apply(this, arguments);
-    this._customBuffs = Array(customParameters.length).fill(0);
-    this._customBuffTurns = Array(customParameters.length).fill(0);
+    this._xbuffs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    this._xbuffTurns = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    this._sbuffs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    this._sbuffTurns = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    // 独自能力値
+    this._cbuffs = Array(customParameters.length).fill(0);
+    this._cbuffTurns = Array(customParameters.length).fill(0);
+    // 会心ダメージ率
+    this._crdBuff = 0;
+    this._crdBuffTurns = 0;
   };
 
-  Game_BattlerBase.prototype.eraseCustomBuff = function (cparamId) {
-    this._customBuffs[cparamId] = 0;
-    this._customBuffTurns[cparamId] = 0;
-  };
+  /**
+   * バフを除去する
+   */
+  Game_BattlerBase.prototype.eraseCustomBuff = function (paramKey, param) {
+    let _param = param;
+    if (_param === undefined) {
+      _param = TCP.paramsDef.find((p) => p.key === paramKey);
+    }
 
-  Game_BattlerBase.prototype.customBuffLength = function () {
-    return this._customBuffs.length;
-  };
-
-  Game_BattlerBase.prototype.customBuff = function (cparamId) {
-    return this._customBuffs[cparamId];
-  };
-
-  Game_BattlerBase.prototype.isCustomBuffAffected = function (cparamId) {
-    return this._customBuffs[cparamId] > 0;
-  };
-
-  Game_BattlerBase.prototype.isCustomDebuffAffected = function (cparamId) {
-    return this._customBuffs[cparamId] < 0;
-  };
-
-  Game_BattlerBase.prototype.isCustomBuffOrDebuffAffected = function (cparamId) {
-    return this._customBuffs[cparamId] !== 0;
-  };
-
-  Game_BattlerBase.prototype.isMaxCustomBuffAffected = function (cparamId) {
-    return this._customBuffs[cparamId] === 2;
-  };
-
-  Game_BattlerBase.prototype.isMaxCustomDebuffAffected = function (cparamId) {
-    return this._customBuffs[cparamId] === -2;
-  };
-
-  Game_BattlerBase.prototype.increaseCustomBuff = function (cparamId) {
-    if (!this.isMaxCustomBuffAffected(cparamId)) {
-      this._customBuffs[cparamId]++;
+    if (_param) {
+      switch (_param.type) {
+        case "param":
+          this.eraseBuff(_param.paramId);
+          break;
+        case "xparam":
+          this._xbuffs[_param.paramId] = 0;
+          this._xbuffTurns[_param.paramId] = 0;
+          break;
+        case "sparam":
+          this._sbuffs[_param.paramId] = 0;
+          this._sbuffTurns[_param.paramId] = 0;
+          break;
+        case "cparam":
+          this._cbuffs[_param.paramId] = 0;
+          this._cbuffTurns[_param.paramId] = 0;
+      }
+    } else if (paramKey === "crd") {
+      this._crdBuff = 0;
+      this._buffTurns = 0;
     }
   };
 
-  Game_BattlerBase.prototype.decreaseCustomBuff = function (cparamId) {
-    if (!this.isMaxCustomDebuffAffected(cparamId)) {
-      this._customBuffs[cparamId]--;
+  Game_BattlerBase.prototype.xbuffLength = function () {
+    return this._xbuffs.length;
+  };
+
+  Game_BattlerBase.prototype.sbuffLength = function () {
+    return this._sbuffs.length;
+  };
+
+  Game_BattlerBase.prototype.cbuffLength = function () {
+    return this._cbuffs.length;
+  };
+
+  /**
+   * バフ段階を取得する
+   */
+  Game_BattlerBase.prototype.customBuff = function (paramKey, param) {
+    let _param = param;
+    if (_param === undefined) {
+      _param = TCP.paramsDef.find((p) => p.key === paramKey);
     }
-  };
 
-  Game_BattlerBase.prototype.overwriteCustomBuffTurns = function (cparamId, turns) {
-    if (this._customBuffTurns[cparamId] < turns) {
-      this._customBuffTurns[cparamId] = turns;
+    if (_param) {
+      switch (_param.type) {
+        case "param":
+          return this.buff(_param.paramId);
+        case "xparam":
+          return this._xbuffs[_param.paramId];
+        case "sparam":
+          return this._sbuffs[_param.paramId];
+        case "cparam":
+          return this._cbuffs[_param.paramId];
+      }
+    } else if (paramKey === "crd") {
+      return this._crdBuff;
     }
+
+    return 0;
   };
 
-  Game_BattlerBase.prototype.isCustomBuffExpired = function (cparamId) {
-    return this._customBuffTurns[cparamId] === 0;
+  /**
+   * バフがかかっているか判定する
+   */
+  Game_BattlerBase.prototype.isCustomBuffAffected = function (paramKey, param) {
+    return this.customBuff(paramKey, param) > 0;
   };
 
-  const _Game_BattlerBase_updateBuffTurns = Game_BattlerBase.prototype.updateBuffTurns;
-  Game_BattlerBase.prototype.updateBuffTurns = function () {
-    _Game_BattlerBase_updateBuffTurns.apply(this, arguments);
-    for (let i = 0; i < this._customBuffTurns.length; i++) {
-      if (this._customBuffTurns[i] > 0) {
-        this._customBuffTurns[i]--;
+  /**
+   * デバフがかかっているか判定する
+   */
+  Game_BattlerBase.prototype.isCustomDebuffAffected = function (paramKey, param) {
+    return this.customBuff(paramKey, param) < 0;
+  };
+
+  /**
+   * バフまたはデバフがかかっているか判定する
+   */
+  Game_BattlerBase.prototype.isCustomBuffOrDebuffAffected = function (paramKey, param) {
+    return this.customBuff(paramKey, param) !== 0;
+  };
+
+  /**
+   * バフが最大までかかっているか判定する
+   */
+  Game_BattlerBase.prototype.isMaxCustomBuffAffected = function (paramKey, param) {
+    let _param = param;
+    if (_param === undefined) {
+      _param = TCP.paramsDef.find((p) => p.key === paramKey);
+    }
+
+    if (_param) {
+      switch (_param.type) {
+        case "param":
+          return this.buff(_param.paramId) === _param.maxBuff;
+        case "xparam":
+          return this._xbuffs[_param.paramId] === _param.maxBuff;
+        case "sparam":
+          return this._sbuffs[_param.paramId] === _param.maxBuff;
+        case "cparam":
+          return this._cbuffs[_param.paramId] === _param.maxBuff;
+      }
+    } else if (paramKey === "crd") {
+      return this._crdBuff === TCP.criticalDamageRate.maxBuff;
+    }
+
+    return false;
+  };
+
+  /**
+   * デバフが最大までかかっているか判定する
+   */
+  Game_BattlerBase.prototype.isMaxCustomDebuffAffected = function (paramKey, param) {
+    let _param = param;
+    if (_param === undefined) {
+      _param = TCP.paramsDef.find((p) => p.key === paramKey);
+    }
+
+    if (_param) {
+      switch (_param.type) {
+        case "param":
+          return this.buff(_param.paramId) === -_param.maxDebuff;
+        case "xparam":
+          return this._xbuffs[_param.paramId] === -_param.maxDebuff;
+        case "sparam":
+          return this._sbuffs[_param.paramId] === -_param.maxDebuff;
+        case "cparam":
+          return this._cbuffs[_param.paramId] === -_param.maxDebuff;
+      }
+    } else if (paramKey === "crd") {
+      return this._crdBuff === -TCP.criticalDamageRate.maxDebuff;
+    }
+
+    return false;
+  };
+
+  /**
+   * バフを1段階付与する
+   */
+  Game_BattlerBase.prototype.increaseCustomBuff = function (paramKey, value, param) {
+    if (!this.isMaxCustomBuffAffected(paramKey, param)) {
+      let _param = param;
+      if (_param === undefined) {
+        _param = TCP.paramsDef.find((p) => p.key === paramKey);
+      }
+
+      if (_param) {
+        switch (_param.type) {
+          case "param":
+            this._buffs[_param.paramId] = (this._buffs[_param.paramId] + value).clamp(
+              -_param.maxDebuff,
+              _param.maxBuff,
+            );
+            break;
+          case "xparam":
+            this._xbuffs[_param.paramId] = (this._buffs[_param.paramId] + value).clamp(
+              -_param.maxDebuff,
+              _param.maxBuff,
+            );
+            break;
+          case "sparam":
+            this._sbuffs[_param.paramId] = (this._buffs[_param.paramId] + value).clamp(
+              -_param.maxDebuff,
+              _param.maxBuff,
+            );
+            break;
+          case "cparam":
+            this._cbuffs[_param.paramId] = (this._buffs[_param.paramId] + value).clamp(
+              -_param.maxDebuff,
+              _param.maxBuff,
+            );
+        }
+      } else if (paramKey === "crd") {
+        this._crdBuff = (this._crdBuff + value).clamp(-_param.maxDebuff, _param.maxBuff);
       }
     }
   };
+
+  /**
+   * デバフを1段階付与する
+   */
+  Game_BattlerBase.prototype.decreaseCustomBuff = function (paramKey, param) {
+    if (!this.isMaxCustomDebuffAffected(paramKey, param)) {
+      let _param = param;
+      if (_param === undefined) {
+        _param = TCP.paramsDef.find((p) => p.key === paramKey);
+      }
+
+      if (_param) {
+        switch (_param.type) {
+          case "param":
+            this._buffs[_param.paramId] = (this._buffs[_param.paramId] - value).clamp(
+              -_param.maxDebuff,
+              _param.maxBuff,
+            );
+            this.decreaseBuff(_param.paramId);
+            break;
+          case "xparam":
+            this._xbuffs[_param.paramId] = (this._buffs[_param.paramId] - value).clamp(
+              -_param.maxDebuff,
+              _param.maxBuff,
+            );
+            break;
+          case "sparam":
+            this._sbuffs[_param.paramId] = (this._buffs[_param.paramId] - value).clamp(
+              -_param.maxDebuff,
+              _param.maxBuff,
+            );
+            break;
+          case "cparam":
+            this._cbuffs[_param.paramId] = (this._buffs[_param.paramId] - value).clamp(
+              -_param.maxDebuff,
+              _param.maxBuff,
+            );
+        }
+      } else if (paramKey === "crd") {
+        this._crdBuff = (this._crdBuff - value).clamp(-_param.maxDebuff, _param.maxBuff);
+      }
+    }
+  };
+
+  /**
+   * バフ効果ターンを上書きする
+   */
+  Game_BattlerBase.prototype.overwriteCustomBuffTurns = function (paramKey, param, turns) {
+    let _param = param;
+    if (_param === undefined) {
+      _param = TCP.paramsDef.find((p) => p.key === paramKey);
+    }
+
+    if (_param) {
+      switch (_param.type) {
+        case "param":
+          this.overwriteBuffTurns(_param.paramId, turns);
+          break;
+        case "xparam":
+          if (this._xbuffTurns[_param.paramId] < turns) {
+            this._xbuffTurns[_param.paramId] = turns;
+          }
+          break;
+        case "sparam":
+          if (this._sbuffTurns[_param.paramId] < turns) {
+            this._sbuffTurns[_param.paramId] = turns;
+          }
+          break;
+        case "cparam":
+          if (this._cbuffTurns[_param.paramId] < turns) {
+            this._cbuffTurns[_param.paramId] = turns;
+          }
+      }
+    } else if (paramKey === "crd") {
+      if (this._crdBuffTurns < turns) {
+        this._crdBuffTurns = turns;
+      }
+    }
+  };
+
+  /**
+   * バフ・デバフが切れているかを判定する
+   */
+  Game_BattlerBase.prototype.isCustomBuffExpired = function (paramKey, param) {
+    let _param = param;
+    if (_param === undefined) {
+      _param = TCP.paramsDef.find((p) => p.key === paramKey);
+    }
+
+    if (_param) {
+      switch (_param.type) {
+        case "param":
+          return this.isBuffExpired(_param.paramId);
+        case "xparam":
+          return this._xbuffTurns[_param.paramId] === 0;
+        case "sparam":
+          return this._sbuffTurns[_param.paramId] === 0;
+        case "cparam":
+          return this._cbuffTurns[_param.paramId] === 0;
+      }
+    } else if (paramKey === "crd") {
+      return this._crdBuffTurns === 0;
+    }
+
+    return true;
+  };
+
+  // バフの効果ターンを更新する
+  const _Game_BattlerBase_updateBuffTurns = Game_BattlerBase.prototype.updateBuffTurns;
+  Game_BattlerBase.prototype.updateBuffTurns = function () {
+    _Game_BattlerBase_updateBuffTurns.apply(this, arguments);
+    // 独自能力値
+    for (let i = 0; i < this._cbuffTurns.length; i++) {
+      if (this._cbuffTurns[i] > 0) {
+        this._cbuffTurns[i]--;
+      }
+    }
+    // 会心ダメージ率
+    if (this._buffTurns > 0) this._buffTurns--;
+  };
+
+  /**
+   * デバフ耐性を取得する
+   */
+  Game_BattlerBase.prototype.customDebuffRate = function (paramKey) {
+    return this.traitObjects()
+      .map((trait) => trait.meta)
+      .filter((meta) => meta)
+      .flatMap((meta) => Object.entries(meta))
+      .filter(([key]) => key.startsWith(`debuffRate_${paramKey}`))
+      .reduce((prev, cur) => prev * (Number(cur[1]) || 1), 1);
+  };
+
+  /**
+   * @override
+   */
+  Game_BattlerBase.prototype.paramBuffRate = function (paramId) {
+    // カスタムバフ倍率を適用
+    return this._buffs[paramId] * TCP.buffRate + 1.0;
+  };
+
+  //===============================
+  // 追加能力値
+
+  /**
+   * 追加能力値の基礎値を取得する
+   *
+   * @see Game_BattlerBase.prototype.xparam
+   */
+  Game_BattlerBase.prototype.xparamBase = function (xparamId) {
+    return _Game_BattlerBase_xparam.call(this, xparamId);
+  };
+
+  /**
+   * 追加能力値の加算値を取得する
+   */
+  Game_BattlerBase.prototype.xparamPlus = function (xparamId) {
+    return (
+      this._xparamPlus[xparamId] +
+      this.traitObjects()
+        .map((trait) => trait.meta)
+        .filter((meta) => meta)
+        .flatMap((meta) => Object.entries(meta))
+        .filter(([key]) => key.startsWith(`add_${param.key}`))
+        .reduce((prev, cur) => prev + Number(cur[1]) || 0, 0)
+    );
+  };
+
+  /**
+   * 追加能力値の加算部分を取得する
+   */
+  Game_BattlerBase.prototype.xparamBasePlus = function (xparamId) {
+    return this.xparamBase(xparamId) + this.xparamPlus(xparamId);
+  };
+
+  /**
+   * 追加能力値の倍率を取得する
+   */
+  Game_BattlerBase.prototype.xparamRate = function (xparamId) {
+    const param = TCP.paramsDef.find((p) => p.type === "xparam" && p.paramId === xparamId);
+
+    return this.traitObjects()
+      .map((trait) => trait.meta)
+      .filter((meta) => meta)
+      .flatMap((meta) => Object.entries(meta))
+      .filter(([key]) => key.startsWith(`prod_${param.key}`))
+      .reduce((prev, cur) => prev * Number(cur[1]) || 1, 1);
+  };
+
+  /**
+   * 追加能力値のバフ倍率を取得する
+   */
+  Game_BattlerBase.prototype.xparamBuffRate = function (xparamId) {
+    return this._xbuffs[xparamId] * TCP.buffRate + 1;
+  };
+
+  const _Game_BattlerBase_xparam = Game_BattlerBase.prototype.xparam;
+  /**
+   * @override
+   */
+  Game_BattlerBase.prototype.xparam = function (xparamId) {
+    const value = this.xparamBasePlus(xparamId) * this.xparamRate(xparamId) * this.xparamBuffRate(xparamId);
+
+    return value.clamp(0, Infinity);
+  };
+
+  //===============================
+  // 特殊能力値
+
+  /**
+   * 特殊能力値の基礎値を取得する
+   *
+   * @see Game_BattlerBase.prototype.sparam
+   */
+  Game_BattlerBase.prototype.sparamBase = function (sparamId) {
+    return _Game_BattlerBase_sparam.call(this, sparamId);
+  };
+
+  /**
+   * 特殊能力値の加算値を取得する
+   */
+  Game_BattlerBase.prototype.sparamPlus = function (sparamId) {
+    return (
+      this._sparamPlus[sparamId] +
+      this.traitObjects()
+        .map((trait) => trait.meta)
+        .filter((meta) => meta)
+        .flatMap((meta) => Object.entries(meta))
+        .filter(([key]) => key.startsWith(`add_${param.key}`))
+        .reduce((prev, cur) => prev + Number(cur[1]) || 0, 0)
+    );
+  };
+
+  /**
+   * 特殊能力値の加算部分を取得スうる
+   */
+  Game_BattlerBase.prototype.sparamBasePlus = function (sparamId) {
+    return this.sparamBase(sparamId) + this.sparamPlus(sparamId);
+  };
+
+  /**
+   * 特殊能力値の倍率を取得する
+   */
+  Game_BattlerBase.prototype.sparamRate = function (sparamId) {
+    const param = TCP.paramsDef.find((p) => p.type === "sparam" && p.paramId === sparamId);
+
+    return this.traitObjects()
+      .map((trait) => trait.meta)
+      .filter((meta) => meta)
+      .flatMap((meta) => Object.entries(meta))
+      .filter(([key]) => key.startsWith(`prod_${param.key}`))
+      .reduce((prev, cur) => prev * Number(cur[1]) || 1, 1);
+  };
+
+  /**
+   * 特殊能力値のバフ倍率を取得する
+   */
+  Game_BattlerBase.prototype.sparamBuffRate = function (sparamId) {
+    return this._sbuffs[sparamId] * TCP.buffRate + 1;
+  };
+
+  const _Game_BattlerBase_sparam = Game_BattlerBase.prototype.xparam;
+  /**
+   * @override
+   */
+  Game_BattlerBase.prototype.sparam = function (sparamId) {
+    const value = this.sparamBasePlus(sparamId) * this.sparamRate(sparamId) * this.sparamBuffRate(sparamId);
+
+    return value.clamp(0, Infinity);
+  };
+
+  //===============================
+  // 独自能力値
 
   /**
    * To be overridden in Game_Actor or Game_Enemy
@@ -1161,7 +1682,7 @@ const setCustomParams = () => {
    * @returns
    */
   Game_BattlerBase.prototype.customParamPlus = function (param) {
-    return this._customParamPlus[param.paramId];
+    return this._cparamPlus[param.paramId];
   };
 
   /**
@@ -1189,7 +1710,7 @@ const setCustomParams = () => {
    * @returns
    */
   Game_BattlerBase.prototype.customParamBuffRate = function (cparamId) {
-    return this._customBuffs[cparamId] * TCP.buffRate + 1.0;
+    return this._cbuffs[cparamId] * TCP.buffRate + 1.0;
   };
 
   /**
@@ -1209,58 +1730,159 @@ const setCustomParams = () => {
   };
 
   Game_BattlerBase.prototype.addCustomParam = function (cparamId, value) {
-    this._customParamPlus[cparamId] += value;
+    this._cparamPlus[cparamId] += value;
     this.refresh();
+  };
+
+  //===============================
+  // 会心ダメージ率
+
+  /**
+   * 会心ダメージ率を計算する
+   */
+  Game_BattlerBase.prototype.crd = function () {
+    const value = this.crdBasePlus() * this.crdRate() * this.crdBuffRate();
+
+    return value.clamp(0, Infinity);
+  };
+
+  /**
+   * 会心ダメージ率基礎値を取得する
+   */
+  Game_BattlerBase.prototype.crdBase = function () {
+    return TCP.criticalDamageRate.default ?? 3;
+  };
+
+  /**
+   * 会心ダメージ率加算値を取得する
+   */
+  Game_BattlerBase.prototype.crdPlus = function () {
+    return (
+      (this._crdPlus ?? 0) +
+      this.traitObjects()
+        .map((trait) => trait.meta)
+        .filter((meta) => meta)
+        .flatMap((meta) => Object.entries(meta))
+        .filter(([key]) => key.startsWith("add_crd"))
+        .reduce((prev, cur) => prev + (Number(cur[1]) || 0), 1)
+    );
+  };
+
+  Game_BattlerBase.prototype.crdBasePlus = function () {
+    return this.crdBase() + this.crdPlus();
+  };
+
+  /**
+   * 会心ダメージ率の倍率を取得する
+   */
+  Game_BattlerBase.prototype.crdRate = function () {
+    return this.traitObjects()
+      .map((trait) => trait.meta)
+      .filter((meta) => meta)
+      .flatMap((meta) => Object.entries(meta))
+      .filter(([key]) => key.startsWith("prod_crd"))
+      .reduce((prev, cur) => prev * (Number(cur[1]) || 1), 1);
+  };
+
+  /**
+   * 会心ダメージ率のバフ倍率を取得する
+   */
+  Game_BattlerBase.prototype.crdBuffRate = function () {
+    return this._crdBuff * 0.25 + 1.0;
+  };
+
+  /**
+   * 会心ダメージ率加算値を変化させる
+   */
+  Game_BattlerBase.prototype.addCrd = function (value) {
+    this._crdPlus += value;
   };
 
   // --------------------------------------------------------------------------
   // Game_Battler
   // --------------------------------------------------------------------------
-  Game_Battler.prototype.addCustomBuff = function (cparamId, turns) {
+  /**
+   * バフを与える
+   */
+  Game_Battler.prototype.addCustomBuff = function (paramKey, param, turns, value) {
     if (this.isAlive()) {
-      this.increaseCustomBuff(cparamId);
-      if (this.isCustomBuffAffected(cparamId)) {
-        this.overwriteCustomBuffTurns(cparamId, turns);
+      this.increaseCustomBuff(paramKey, value ?? 1, param);
+      if (this.isCustomBuffAffected(paramKey, param)) {
+        this.overwriteCustomBuffTurns(paramKey, param, turns);
       }
-      this._result.pushAddedCustomBuff(cparamId);
+      this._result.pushAddedCustomBuff(paramKey);
       this.refresh();
     }
   };
 
-  Game_Battler.prototype.addCustomDebuff = function (cparamId, turns) {
+  /**
+   * デバフを与える
+   */
+  Game_Battler.prototype.addCustomDebuff = function (paramKey, param, turns, value) {
     if (this.isAlive()) {
-      this.decreaseCustomBuff(cparamId);
-      if (this.isCustomDebuffAffected(cparamId)) {
-        this.overwriteCustomBuffTurns(cparamId, turns);
+      this.decreaseCustomBuff(paramKey, value, param);
+      if (this.isCustomDebuffAffected(paramKey, param)) {
+        this.overwriteCustomBuffTurns(paramKey, param, turns);
       }
-      this._result.pushAddedCustomDebuff(cparamId);
+      this._result.pushAddedCustomDebuff(paramKey);
       this.refresh();
     }
   };
 
-  Game_Battler.prototype.removeCustomBuff = function (cparamId) {
-    if (this.isAlive() && this.isCustomBuffOrDebuffAffected(cparamId)) {
-      this.eraseCustomBuff(cparamId);
-      this._result.pushRemovedCustomBuff(cparamId);
+  /**
+   * バフを除去する
+   */
+  Game_Battler.prototype.removeCustomBuff = function (paramKey, param) {
+    if (this.isAlive() && this.isCustomBuffOrDebuffAffected(paramKey, param)) {
+      this.eraseCustomBuff(paramKey, param);
+      this._result.pushRemovedCustomBuff(paramKey);
       this.refresh();
     }
   };
 
+  // 全てのバフを除去する
   const _Game_Battler_removeAllBuffs = Game_Battler.prototype.removeAllBuffs;
   Game_Battler.prototype.removeAllBuffs = function () {
-    _Game_Battler_removeAllBuffs.apply(this, arguments);
-    for (let i = 0; i < this.customBuffLength(); i++) {
-      this.removeCustomBuff(i);
+    _Game_Battler_removeAllBuffs.call(this);
+    for (let i = 0; i < this.xbuffLength(); i++) {
+      const param = TCP.paramsDef.find((p) => p.type === "xparam" && p.paramId === i);
+      this.removeCustomBuff(param.key, param);
     }
+    for (let i = 0; i < this.sbuffLength(); i++) {
+      const param = TCP.paramsDef.find((p) => p.type === "sparam" && p.paramId === i);
+      this.removeCustomBuff(param.key, param);
+    }
+    for (let i = 0; i < this.cbuffLength(); i++) {
+      const param = TCP.paramsDef.find((p) => p.type === "cparam" && p.paramId === i);
+      this.removeCustomBuff(param.key, param);
+    }
+    this.removeCustomBuff("crd");
   };
 
+  // 効果ターンが切れたら自動でバフを除去する
   const _Game_Battler_removeBuffsAuto = Game_Battler.prototype.removeBuffsAuto;
   Game_Battler.prototype.removeBuffsAuto = function () {
-    _Game_Battler_removeBuffsAuto.apply(this, arguments);
-    for (let i = 0; i < this.customBuffLength(); i++) {
-      if (this.isCustomBuffExpired(i)) {
-        this.removeCustomBuff(i);
+    _Game_Battler_removeBuffsAuto.call(this);
+    for (let i = 0; i < this.xbuffLength(); i++) {
+      const param = TCP.paramsDef.find((p) => p.type === "xparam" && p.paramId === i);
+      if (this.isCustomBuffExpired(param.key, param)) {
+        this.removeCustomBuff(param.key, param);
       }
+    }
+    for (let i = 0; i < this.sbuffLength(); i++) {
+      const param = TCP.paramsDef.find((p) => p.type === "sparam" && p.paramId === i);
+      if (this.isCustomBuffExpired(param.key, param)) {
+        this.removeCustomBuff(param.key, param);
+      }
+    }
+    for (let i = 0; i < this.cbuffLength(); i++) {
+      const param = TCP.paramsDef.find((p) => p.type === "cparam" && p.paramId === i);
+      if (this.isCustomBuffExpired(param.key, param)) {
+        this.removeCustomBuff(param.key, param);
+      }
+    }
+    if (this.isCustomBuffExpired("crd")) {
+      this.removeCustomBuff("crd");
     }
   };
 

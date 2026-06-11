@@ -34,17 +34,12 @@
  *
  */
 
-// TODO
-// 装備情報
-// ステータス情報
-// ページング
-
 "use strict";
 
 /**
  * Global variable
  */
-const TAW = {};
+const TAW = { isEnableTCP: TCP !== undefined };
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Utilities
@@ -350,6 +345,7 @@ const readParams = (script) => {
     initialize(rect) {
       super.initialize(rect);
       this._battler = null;
+      this._pageIndex = 0;
       this.openness = 0;
       this.deactivate();
     }
@@ -363,6 +359,7 @@ const readParams = (script) => {
      */
     set battler(battler) {
       this._battler = battler;
+      this._pageIndex = 0;
       this.refresh();
     }
 
@@ -377,13 +374,169 @@ const readParams = (script) => {
       this.contents.clear();
       if (!this._battler) return;
 
-      const b = this._battler;
+      // const h = this.lineHeight();
+      this.drawPageHeader();
+
+      switch (this._pageIndex) {
+        case 0:
+          this.drawStatusPage();
+          break;
+        case 1:
+          this.drawEquipPage();
+          break;
+        case 2:
+          this.drawResistPage();
+          break;
+      }
+    }
+
+    update() {
+      super.update();
+
+      if (this.active) {
+        if (Input.isRepeated("right")) {
+          this.changePage(1);
+        } else if (Input.isRepeated("left")) {
+          this.changePage(-1);
+        }
+      }
+    }
+
+    changePage(delta) {
+      this._pageIndex = (this._pageIndex + delta + 3) % 3;
+      SoundManager.playCursor();
+      this.refresh();
+    }
+
+    drawHorzLine(y) {
+      this.contents.fillRect(0, y, this.contentsWidth(), 2, ColorManager.normalColor());
+    }
+
+    drawPageHeader() {
+      const pages = ["【詳細ステータス】", "【装備情報】", "【耐性情報】"];
+      this.changeTextColor(ColorManager.systemColor());
+      this.drawText(pages[this._pageIndex], 0, 0, this.contentsWidth(), "center");
+      this.resetTextColor();
+      this.drawText("Q/W(L/R):切替", 0, 0, this.contentsWidth(), "right");
+    }
+
+    drawStatusPage() {
+      const target = this._battler;
+      const x = this.itemPadding();
+      let y = this.lineHeight();
+
+      for (let i = 0; i < TAW.isEnableTCP ? TCP.paramsDef.length : 8; i++) {
+        let paramName, baseVal, currentVal, buffLevel;
+        if (TAW.isEnableTCP) {
+          // T_CustomParameters が有効
+          const param = TCP.paramsDef[i];
+          paramName = param.name;
+          switch (param.type) {
+            case "param":
+              baseVal = Math.round(
+                (target.paramBasePlus(param.paramId) * target.paramRate(param.paramId)).clamp(
+                  param.min,
+                  param.max ?? Infinity,
+                ),
+              );
+              currentVal = target.param(param.paramId);
+              buffLevel = target.buff(param.paramId);
+            case "xparam":
+              baseVal = (target.xparamBasePlus(param.paramId) * target.xparamRate(param.paramId)).clamp(0, 1);
+              currentVal = target.xparam(param.paramId);
+              buffLevel = target._xbuffs[param.paramId];
+            case "sparam":
+              baseVal = (target.sparamBasePlus(param.paramId) * target.sparamRate(param.paramId)).clamp(0, 1);
+              currentVal = target.sparam(param.paramId);
+              buffLevel = target._sbuffs[param.paramId];
+            case "cparam":
+              baseVal = target.customParamBasePlus(param.paramId) * target.customParamRate(param.paramId);
+              if (param.isRate) {
+                baseVal = baseVal.clamp(0, Infinity);
+              } else {
+                baseVal = Math.round(baseVal.clamp(param.min, param.max ?? Infinity));
+              }
+              currentVal = target.cparam(param.paramId);
+              buffLevel = target.customBuff(param.paramId);
+          }
+        } else {
+          paramName = TextManager.param(i);
+          // 元の数値 (レベル + 装備 + 成長アイテム加算) [1-3]
+          baseVal = Math.round(
+            (target.paramBasePlus(i) * target.paramRate(i)).clamp(target.paramMin(i), target.paramMax()),
+          );
+          // 現在の最終値 (バフ・デバフ・特徴倍率反映後) [1]
+          currentVal = target.param(i);
+          buffLevel = target.buff(i); // バフ段階 (-2 ～ +2)
+        }
+        this.changeTextColor(ColorManager.systemColor());
+        this.drawText(paramName, x, y, 120);
+        this.resetTextColor();
+
+        // 数値比較表示
+        this.drawText(baseVal, x + 130, y, 60, "right");
+        this.drawText("→", x + 190, y, 40, "center");
+
+        // 変動に応じて数値の色を変える
+        if (currentVal > baseVal) this.changeTextColor(ColorManager.powerUpColor());
+        if (currentVal < baseVal) this.changeTextColor(ColorManager.powerDownColor());
+        this.drawText(currentVal, x + 230, y, 70, "right");
+        this.resetTextColor();
+
+        // バフ/デバフ状態の簡易表示
+        if (buffLevel !== 0) {
+          const iconIndex = buffLevel > 0 ? 32 + i : 48 + i; // 標準のバフ/デバフアイコン
+          this.drawIcon(iconIndex, x + 310, y + 2);
+          const mark = buffLevel > 0 ? "▲".repeat(buffLevel) : "▼".repeat(Math.abs(buffLevel));
+          this.drawText(mark, x + 345, y, 60);
+        }
+        y += this.lineHeight();
+      }
+    }
+
+    drawEquipPage() {
+      const target = this._battler;
+      if (!target.isActor()) {
+        this.drawText("敵キャラの装備情報はありません。", 0, this.contentsHeight() / 2, this.contentsWidth(), "center");
+        return;
+      }
+
+      const equips = target.equips(); // 現在の装備品を取得 [2]
+      let y = this.lineHeight();
+      const x = this.itemPadding();
+
+      equips.forEach((item) => {
+        if (item) {
+          this.drawItemName(item, x, y, this.contentsWidth() - x * 2);
+
+          // 装備による能力上昇値を右側に小さく表示 [2]
+          let bonusDesc = "";
+          for (let i = 0; i < 8; i++) {
+            const p = item.params[i];
+            if (p !== 0) {
+              bonusDesc += ` ${TextManager.param(i).charAt(0)}:${p > 0 ? "+" : ""}${p}`;
+            }
+          }
+          this.contents.fontSize = 16;
+          this.drawText(bonusDesc, x, y, this.contentsWidth() - x - 10, "right");
+          this.contents.fontSize = $gameSystem.mainFontSize();
+        } else {
+          this.changePaintOpacity(false);
+          this.drawText("（未装備）", x + ImageManager.iconWidth + 4, y, this.contentsWidth());
+          this.changePaintOpacity(true);
+        }
+        y += this.lineHeight();
+      });
+    }
+
+    drawResistPage() {
+      const target = this._battler;
       let y = 0;
 
       // 名前・識別表示
-      const sideText = b.isActor() ? "【味方】" : "【敵】";
+      const sideText = target.isActor() ? "【味方】" : "【敵】";
       this.changeTextColor(ColorManager.systemColor());
-      this.drawText(`${sideText} ${b.name()} の解析情報`, 0, y, this.contentsWidth(), "left");
+      this.drawText(`${sideText} ${target.name()} の解析情報`, 0, y, this.contentsWidth(), "left");
       y += this.lineHeight();
       this.drawHorzLine(y);
       y += 10;
@@ -393,7 +546,7 @@ const readParams = (script) => {
       this.drawText("【付与されているステート】", 0, y, this.contentsWidth());
       y += this.lineHeight();
 
-      const states = b.states();
+      const states = target.states();
       if (states.length === 0) {
         this.changeTextColor(ColorManager.normalColor());
         this.drawText(" なし", 10, y, this.contentsWidth());
@@ -425,13 +578,13 @@ const readParams = (script) => {
           const elementName = $dataSystem.elements[elementId];
           let rankText = "通常";
           let rate = 1.0;
-          if (b._elementRanks !== undefined) {
-            const rank = TERS.elementRanks[b._elementRanks[elementId]];
+          if (target._elementRanks !== undefined) {
+            const rank = TERS.elementRanks[target._elementRanks[elementId]];
             rankText = rank.name;
             rate = rank.rate;
           } else {
             // ツクール標準の計算値（プラグインの変動も反映された最終有効度）
-            rate = b.elementRate(elementId);
+            rate = target.elementRate(elementId);
 
             if (rate < 0) rankText = "吸収";
             else if (rate === 0) rankText = "無効";
@@ -454,10 +607,6 @@ const readParams = (script) => {
           y += this.lineHeight();
         }
       }
-    }
-
-    drawHorzLine(y) {
-      this.contents.fillRect(0, y, this.contentsWidth(), 2, ColorManager.normalColor());
     }
   }
 
