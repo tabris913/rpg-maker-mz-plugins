@@ -288,8 +288,8 @@ const readParams = (script) => {
     return value + evBonus;
   };
 
-  const Game_Actor_customParamPlus = Game_Actor.prototype.customParamPlus;
-  Game_Actor.prototype.customParamPlus = function (param) {
+  const Game_Actor_customParamPlus = Game_Actor.prototype.cparamPlus;
+  Game_Actor.prototype.cparamPlus = function (param) {
     let value = Game_Actor_customParamPlus(param.paramId);
     const evBonus = Math.floor(this._effortValues[param.paramId] / TEVS.threshold);
 

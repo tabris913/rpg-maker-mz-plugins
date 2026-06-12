@@ -1672,7 +1672,7 @@ const setCustomParams = () => {
    * @param {TCP.Cparam} param
    * @returns
    */
-  Game_BattlerBase.prototype.customParamBase = function (param) {
+  Game_BattlerBase.prototype.cparamBase = function (param) {
     return 0;
   };
 
@@ -1681,7 +1681,7 @@ const setCustomParams = () => {
    * @param {TCP.Cparam} param
    * @returns
    */
-  Game_BattlerBase.prototype.customParamPlus = function (param) {
+  Game_BattlerBase.prototype.cparamPlus = function (param) {
     return this._cparamPlus[param.paramId];
   };
 
@@ -1690,8 +1690,8 @@ const setCustomParams = () => {
    * @param {TCP.Cparam} param
    * @returns
    */
-  Game_BattlerBase.prototype.customParamBasePlus = function (param) {
-    return Math.max(param.min, this.customParamBase(param) + this.customParamPlus(param));
+  Game_BattlerBase.prototype.cparamBasePlus = function (param) {
+    return Math.max(param.min, this.cparamBase(param) + this.cparamPlus(param));
   };
 
   /**
@@ -1700,7 +1700,7 @@ const setCustomParams = () => {
    * @param {TCP.Cparam} param
    * @returns
    */
-  Game_BattlerBase.prototype.customParamRate = function (param) {
+  Game_BattlerBase.prototype.cparamRate = function (param) {
     return 1;
   };
 
@@ -1709,7 +1709,7 @@ const setCustomParams = () => {
    * @param {number} cparamId
    * @returns
    */
-  Game_BattlerBase.prototype.customParamBuffRate = function (cparamId) {
+  Game_BattlerBase.prototype.cparamBuffRate = function (cparamId) {
     return this._cbuffs[cparamId] * TCP.buffRate + 1.0;
   };
 
@@ -1724,7 +1724,7 @@ const setCustomParams = () => {
       throw new Error("指定されたIDの独自能力値が見つかりませんでした");
     }
 
-    const value = this.customParamBasePlus(param) * this.customParamRate(cparamId) * this.customParamBuffRate(cparamId);
+    const value = this.cparamBasePlus(param) * this.cparamRate(cparamId) * this.cparamBuffRate(cparamId);
     const clampedValue = value.clamp(param.min ?? 0, param.max ?? Infinity);
     return param.isRate ? clampedValue : Math.round(clampedValue);
   };
@@ -1906,9 +1906,9 @@ const setCustomParams = () => {
   /**
    *
    * @param {TCP.Cparam} cparam
-   * @see Game_BattlerBase.prototype.customParamBase
+   * @see Game_BattlerBase.prototype.cparamBase
    */
-  Game_Actor.prototype.customParamBase = function (cparam) {
+  Game_Actor.prototype.cparamBase = function (cparam) {
     /**
      * @type number
      */
@@ -1991,10 +1991,10 @@ const setCustomParams = () => {
   /**
    *
    * @param {TCP.Cparam} param
-   * @see Game_BattlerBase.prototype.customParamPlus
+   * @see Game_BattlerBase.prototype.cparamPlus
    */
-  Game_Actor.prototype.customParamPlus = function (param) {
-    let value = Game_Battler.prototype.customParamPlus.call(this, param);
+  Game_Actor.prototype.cparamPlus = function (param) {
+    let value = Game_Battler.prototype.cparamPlus.call(this, param);
     // 加算のみ
     for (const item of this.equips() || []) {
       if (item && item.meta[`add_${param.key}`] !== undefined) {
@@ -2013,9 +2013,9 @@ const setCustomParams = () => {
   /**
    *
    * @param {TCP.Cparam} param
-   * @see Game_BattlerBase.prototype.customParamRate
+   * @see Game_BattlerBase.prototype.cparamRate
    */
-  Game_Actor.prototype.customParamRate = function (param) {
+  Game_Actor.prototype.cparamRate = function (param) {
     let value = 1;
     for (const item of this.equips() || []) {
       if (item && item.meta[`prod_${param.key}`] !== undefined) {
@@ -2037,9 +2037,9 @@ const setCustomParams = () => {
   /**
    *
    * @param {TCP.Cparam} cparam
-   * @see Game_BattlerBase.prototype.customParamBase
+   * @see Game_BattlerBase.prototype.cparamBase
    */
-  Game_Enemy.prototype.customParamBase = function (cparam) {
+  Game_Enemy.prototype.cparamBase = function (cparam) {
     // レベルアップ対応は別プラグイン化
     let value = 0;
     if (this.enemy().meta && this.enemy().meta[`add_${cparam.key}`] !== undefined) {
@@ -2052,10 +2052,10 @@ const setCustomParams = () => {
   /**
    *
    * @param {TCP.Cparam} cparam
-   * @see Game_BattlerBase.prototype.customParamPlus
+   * @see Game_BattlerBase.prototype.cparamPlus
    */
-  Game_Enemy.prototype.customParamPlus = function (cparam) {
-    let value = Game_Battler.prototype.customParamPlus.call(this, cparam);
+  Game_Enemy.prototype.cparamPlus = function (cparam) {
+    let value = Game_Battler.prototype.cparamPlus.call(this, cparam);
     // 加算のみ
     for (const state of this.states()) {
       if (state && state.meta[`add_${cparam.key}`] !== undefined) {
@@ -2069,9 +2069,9 @@ const setCustomParams = () => {
   /**
    *
    * @param {TCP.Cparam} cparam
-   * @see Game_BattlerBase.prototype.customParamRate
+   * @see Game_BattlerBase.prototype.cparamRate
    */
-  Game_Enemy.prototype.customParamRate = function (cparam) {
+  Game_Enemy.prototype.cparamRate = function (cparam) {
     let value = 1;
     for (const state of this.states()) {
       if (state && state.meta[`prod_${cparam.key}`] !== undefined) {

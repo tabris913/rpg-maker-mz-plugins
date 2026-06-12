@@ -1,6 +1,14 @@
 declare const TAW: {
   isEnableTCP: boolean;
+  showEnemyHpMp: boolean;
+  showEnemyParamChange: boolean;
 };
+
+interface GlobalTAW {
+  isEnableTCP: boolean;
+  showEnemyHpMp: boolean;
+  showEnemyParamChange: boolean;
+}
 
 interface Scene_Battle {
   createAnalysisToggleWindow: () => void;

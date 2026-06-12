@@ -240,11 +240,11 @@ interface Game_BattlerBase {
   crd: () => number;
   addCrd: (value: number) => void;
 
-  customParamBase: (param: Cparam) => number;
-  customParamPlus: (param: Cparam) => number;
-  customParamBasePlus: (param: Cparam) => number;
-  customParamRate: (param: Cparam) => number;
-  customParamBuffRate: (cparamId: number) => number;
+  cparamBase: (param: Cparam) => number;
+  cparamPlus: (param: Cparam) => number;
+  cparamBasePlus: (param: Cparam) => number;
+  cparamRate: (param: Cparam) => number;
+  cparamBuffRate: (cparamId: number) => number;
   cparam: (cparamId: number) => number;
   addCustomParam: (cparamId: number, value: number) => void;
 }

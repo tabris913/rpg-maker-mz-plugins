@@ -288,17 +288,17 @@ TELS.readParams = (script) => {
     return _Game_Enemy_paramBase.apply(this, arguments);
   };
 
-  const _Game_Enemy_customParamBase = Game_Enemy.prototype.customParamBase;
+  const _Game_Enemy_customParamBase = Game_Enemy.prototype.cparamBase;
   /**
    * T_CustomParameters.js を利用しているときのみ呼び出される
    *
    * @param {TCP.Cparam} cparam
    * @returns {number}
    */
-  Game_Enemy.prototype.customParamBase = function (cparam) {
+  Game_Enemy.prototype.cparamBase = function (cparam) {
     if (this.classId) {
       // クラス指定あり
-      const value = Game_Actor.prototype.customParamBase.call(this, cparam);
+      const value = Game_Actor.prototype.cparamBase.call(this, cparam);
       return value;
     }
 

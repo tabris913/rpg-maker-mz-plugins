@@ -16,6 +16,11 @@
  *   @desc
  *   @type
  *   @default
+ * @param
+ *   @text
+ *   @desc
+ *   @type
+ *   @default
  *
  * @help
  * ================================

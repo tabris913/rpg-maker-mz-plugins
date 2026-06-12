@@ -699,4 +699,32 @@ TERS.readParams = (script) => {
   // -------------------------------------------------------------------------------------------------------------------
   // Windows
   // -------------------------------------------------------------------------------------------------------------------
+  // ----------------------------------------------------------------------------
+  // Window_BattleLog
+  // ----------------------------------------------------------------------------
+  /**
+   * @override
+   */
+  Window_BattleLog.prototype.displayActionResults = function (subject, target) {
+    const result = target.result();
+    const instantDeathCondition =
+      target.isDead() && result.isStatusAffected(target.deathStateId()) && target._instantDeath;
+
+    if (target.result().used) {
+      this.push("pushBaseLine");
+      this.displayCritical(target);
+      // 即死効果で与えたダメージはポップアップを表示させない
+      if (!instantDeathCondition) {
+        this.push("popupDamage", target);
+      }
+      this.push("popupDamage", subject);
+      if (!instantDeathCondition) {
+        this.displayDamage(target);
+      }
+      this.displayAffectedStatus(target);
+      this.displayFailure(target);
+      this.push("waitForNewLine");
+      this.push("popBaseLine");
+    }
+  };
 })();
