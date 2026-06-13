@@ -20,4 +20,5 @@ interface Game_Enemy {
   currentClass: () => rm.types.RPGClass;
   setupClassId: () => void;
   getCurrentLevel: () => number;
+  maxLevel: () => number;
 }

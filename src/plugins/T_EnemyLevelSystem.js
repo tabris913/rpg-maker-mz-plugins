@@ -1,5 +1,3 @@
-/// <reference path="../types/T_EnemyLevelSystem.d.ts" />
-
 //=============================================================================
 // RPG Maker MZ - T_EnemyLevelSystem
 //=============================================================================
@@ -329,6 +327,15 @@ TELS.readParams = (script) => {
     }
 
     return name;
+  };
+
+  /**
+   * 最大レベルを取得する
+   *
+   * 全アクターの最も高い最大レベルと等しい
+   */
+  Game_Enemy.prototype.maxLevel = function () {
+    return Math.max(...$dataActors.filter((a) => a).map((a) => a.maxLevel));
   };
 
   Game_Enemy.prototype.makeActions = function () {

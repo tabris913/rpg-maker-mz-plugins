@@ -1,5 +1,3 @@
-/// <reference path="../types/T_CustomParameters.d.ts" />
-
 //=============================================================================
 // RPG Maker MZ - T_CustomParameters
 //=============================================================================
@@ -1549,14 +1547,17 @@ const setCustomParams = () => {
    * 追加能力値の加算値を取得する
    */
   Game_BattlerBase.prototype.xparamPlus = function (xparamId) {
+    const param = TCP.paramsDef.find((p) => p.type === "xparam" && p.paramId === xparamId);
     return (
       this._xparamPlus[xparamId] +
-      this.traitObjects()
-        .map((trait) => trait.meta)
-        .filter((meta) => meta)
-        .flatMap((meta) => Object.entries(meta))
-        .filter(([key]) => key.startsWith(`add_${param.key}`))
-        .reduce((prev, cur) => prev + Number(cur[1]) || 0, 0)
+      (param
+        ? this.traitObjects()
+            .map((trait) => trait.meta)
+            .filter((meta) => meta)
+            .flatMap((meta) => Object.entries(meta))
+            .filter(([key]) => key.startsWith(`add_${param.key}`))
+            .reduce((prev, cur) => prev + Number(cur[1]) || 0, 0)
+        : 0)
     );
   };
 
@@ -1614,14 +1615,18 @@ const setCustomParams = () => {
    * 特殊能力値の加算値を取得する
    */
   Game_BattlerBase.prototype.sparamPlus = function (sparamId) {
+    const param = TCP.paramsDef.find((p) => p.type === "sparam" && p.paramId === sparamId);
+
     return (
       this._sparamPlus[sparamId] +
-      this.traitObjects()
-        .map((trait) => trait.meta)
-        .filter((meta) => meta)
-        .flatMap((meta) => Object.entries(meta))
-        .filter(([key]) => key.startsWith(`add_${param.key}`))
-        .reduce((prev, cur) => prev + Number(cur[1]) || 0, 0)
+      (param
+        ? this.traitObjects()
+            .map((trait) => trait.meta)
+            .filter((meta) => meta)
+            .flatMap((meta) => Object.entries(meta))
+            .filter(([key]) => key.startsWith(`add_${param.key}`))
+            .reduce((prev, cur) => prev + Number(cur[1]) || 0, 0)
+        : 0)
     );
   };
 

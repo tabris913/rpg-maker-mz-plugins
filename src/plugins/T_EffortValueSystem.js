@@ -1,5 +1,3 @@
-/// <reference path="../types/T_EffortValueSystem.d.ts" />
-
 //=============================================================================
 // RPG Maker MZ - T_EffortValueSystem.js
 //=============================================================================
@@ -282,7 +280,7 @@ const readParams = (script) => {
 
   const _Game_Actor_paramPlus = Game_Actor.prototype.paramPlus;
   Game_Actor.prototype.paramPlus = function (paramId) {
-    let value = _Game_Actor_paramPlus(paramId);
+    let value = _Game_Actor_paramPlus.call(this, paramId);
     const evBonus = Math.floor(this._effortValues[paramId] / TEVS.threshold);
 
     return value + evBonus;
@@ -290,7 +288,7 @@ const readParams = (script) => {
 
   const Game_Actor_customParamPlus = Game_Actor.prototype.cparamPlus;
   Game_Actor.prototype.cparamPlus = function (param) {
-    let value = Game_Actor_customParamPlus(param.paramId);
+    let value = Game_Actor_customParamPlus.call(this, param);
     const evBonus = Math.floor(this._effortValues[param.paramId] / TEVS.threshold);
 
     return value + evBonus;

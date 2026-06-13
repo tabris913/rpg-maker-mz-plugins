@@ -1,5 +1,3 @@
-/// <reference path="../types/T_AnalysisWindow.d.ts" />
-
 //=============================================================================
 // RPG Maker MZ - T_AnalysisWindow
 //=============================================================================
@@ -57,7 +55,7 @@ const TAW = {};
  *
  * @param {HTMLOrSVGScriptElement | null} script
  */
-const readParams = (script) => {
+TAW.readParams = (script) => {
   const params = PluginManagerEx.createParameter(script);
 
   TAW.isEnableTCP = typeof TCP !== "undefined";
@@ -70,7 +68,7 @@ const readParams = (script) => {
 // ---------------------------------------------------------------------------------------------------------------------
 (() => {
   const script = document.currentScript;
-  readParams(script);
+  TAW.readParams(script);
 
   // -------------------------------------------------------------------------------------------------------------------
   // Scenes
@@ -338,6 +336,7 @@ const readParams = (script) => {
   // ----------------------------------------------------------------------------
   // Window_BattleAnalysis
   // ----------------------------------------------------------------------------
+  // TODO スクロールできないのでできるようにする
   class Window_BattleAnalysis extends Window_Selectable {
     /**
      * @param {Rectangle} rect
@@ -402,6 +401,7 @@ const readParams = (script) => {
     }
 
     // 左右キーでページ切り替えを行う
+    // TODO Q/W/L,Rでページ移動できないからできるように
     update() {
       super.update();
       if (this.active) {
@@ -437,9 +437,11 @@ const readParams = (script) => {
       this.changeTextColor(ColorManager.systemColor());
       this.drawText(pages[this._pageIndex], 0, 0, this.contentsWidth(), "center");
       this.resetTextColor();
-      this.drawText("Q/W(L/R):切替", 0, 0, this.contentsWidth(), "right");
+      this.drawText("Q/W(L/R):ページ切替", 0, 0, this.contentsWidth(), "right");
     }
 
+    // TODO 確率能力値は%表示
+    // TODO 名前と数値はもう少し離したほうがよさそう？
     drawStatusPage() {
       const target = this._battler;
       const x = this.itemPadding();
@@ -450,12 +452,12 @@ const readParams = (script) => {
         let paramName, baseVal, currentVal, buffLevel;
         if (TAW.isEnableTCP) {
           const param = TCP.paramsDef[i];
-          paramName = param.name;
+          paramName = param.nameId === undefined ? param.name : TextManager.param(param.nameId);
           switch (param.type) {
             case "param":
               baseVal = Math.round(
                 (target.paramBasePlus(param.paramId) * target.paramRate(param.paramId)).clamp(
-                  param.min,
+                  param.min ?? (param.paramId === 0 ? 1 : 0),
                   param.max ?? Infinity,
                 ),
               );
@@ -495,12 +497,12 @@ const readParams = (script) => {
         this.drawText(paramName, x, y, 120);
         this.resetTextColor();
         this.drawText(baseVal, x + 130, y, 60, "right");
-        this.drawText("→", x + 190, y, 40, "center");
-        if (currentVal > baseVal) this.changeTextColor(ColorManager.powerUpColor());
-        if (currentVal < baseVal) this.changeTextColor(ColorManager.powerDownColor());
-        this.drawText(currentVal, x + 230, y, 70, "right");
-        this.resetTextColor();
         if (buffLevel !== 0) {
+          this.drawText("→", x + 190, y, 40, "center");
+          if (currentVal > baseVal) this.changeTextColor(ColorManager.powerUpColor());
+          if (currentVal < baseVal) this.changeTextColor(ColorManager.powerDownColor());
+          this.drawText(currentVal, x + 230, y, 70, "right");
+          this.resetTextColor();
           const iconIndex = buffLevel > 0 ? 32 + i : 48 + i;
           this.drawIcon(iconIndex, x + 310, y + 2);
           const mark = buffLevel > 0 ? "▲".repeat(buffLevel) : "▼".repeat(Math.abs(buffLevel));
@@ -510,6 +512,8 @@ const readParams = (script) => {
       }
     }
 
+    // TODO 確率能力値は%表示
+    // TODO 名前と数値はもう少し離したほうがよさそう？
     drawEnemyStatusPage() {
       const target = this._battler;
       const x = this.itemPadding();
@@ -538,12 +542,12 @@ const readParams = (script) => {
           let paramName, baseVal, currentVal, buffLevel;
           if (TAW.isEnableTCP) {
             const param = TCP.paramsDef[i];
-            paramName = param.name;
+            paramName = param.nameId === undefined ? param.name : TextManager.param(param.nameId);
             switch (param.type) {
               case "param":
                 baseVal = Math.round(
                   (target.paramBasePlus(param.paramId) * target.paramRate(param.paramId)).clamp(
-                    param.min,
+                    param.min ?? (param.paramId === 0 ? 1 : 0),
                     param.max ?? Infinity,
                   ),
                 );
@@ -655,6 +659,7 @@ const readParams = (script) => {
       this.drawText(`HP: ${target.mhp - target.hp}`, x + 10, y, this.contentsWidth());
     }
 
+    // TODO 部位の名前を先頭につける
     drawEquipPage() {
       const target = this._battler;
       if (!target.isActor()) return;
