@@ -1,3 +1,5 @@
+/// <reference path="../types/T_CustomParameters.d.ts" />
+
 //=============================================================================
 // RPG Maker MZ - T_CustomParameters
 //=============================================================================
@@ -929,7 +931,20 @@ TCP.readParams = (script) => {
     builtInParams.magicDamageRate,
     builtInParams.floorDamageRate,
     builtInParams.experienceRate,
-  ].concat(additionalParams);
+  ]
+    .concat(additionalParams)
+    .concat({
+      key: "crd",
+      name: "会心ダメージ倍率",
+      min: 0,
+      max: Infinity,
+      maxBuff: PluginParamParser.number(params.criticalDamageRate.maxBuff, 0),
+      maxDebuff: PluginParamParser.number(params.criticalDamageRate.maxDebuff, 0),
+      isRate: true,
+      visible: PluginParamParser.boolean(params.criticalDamageRate.visible, false),
+      displayOrder: PluginParamParser.number(params.criticalDamageRate.displayOrder, 26),
+      type: "",
+    });
 
   TCP.paramsDef = paramsDef.sort((a, b) => (a.displayOrder ?? 100) - (b.displayOrder ?? 100));
   TCP.buffRate = params.buffRate ?? 0.25;
@@ -2134,31 +2149,26 @@ const setCustomParams = () => {
     const param = visibleParams[paramId];
     const width = this.paramX() - this.itemPadding() * 2;
     this.changeTextColor(ColorManager.systemColor());
-    this.drawText(
-      (param.nameId === undefined ? param.name : TextManager.param(param.nameId)) + (param.isRate ? " [%]" : ""),
-      x,
-      y,
-      width,
-    );
+    this.drawText(param.nameId === undefined ? param.name : TextManager.param(param.nameId), x, y, width);
   };
 
   Window_EquipStatus.prototype.drawCurrentParam = function (x, y, paramId) {
     const param = visibleParams[paramId];
     const paramWidth = this.paramWidth();
-    const value = this._actor[param.type](param.paramId);
+    const value = param.key === "crd" ? this._actor.crd() : this._actor[param.type](param.paramId);
     this.resetTextColor();
-    this.drawText(param.isRate ? Math.round(value * 100) : value, x, y, paramWidth, "right");
+    this.drawText(param.isRate ? `${Math.round(value * 100)} %` : value, x, y, paramWidth, "right");
   };
 
   Window_EquipStatus.prototype.drawNewParam = function (x, y, paramId) {
     const param = visibleParams[paramId];
     const paramWidth = this.paramWidth();
-    const newValue = this._tempActor[param.type](param.paramId);
-    const diffValue = this._actor[param.type](param.paramId);
+    const newValue = param.key === "crd" ? this._tempActor.crd() : this._tempActor[param.type](param.paramId);
+    const diffValue = param.key === "crd" ? this._actor.crd() : this._actor[param.type](param.paramId);
     // 変化しない場合は非表示
     if (newValue === diffValue) return;
     this.changeTextColor(ColorManager.paramchangeTextColor(diffValue));
-    this.drawText(param.isRate ? Math.round(newValue * 100) : newValue, x, y, paramWidth, "right");
+    this.drawText(param.isRate ? `${Math.round(value * 100)} %` : newValue, x, y, paramWidth, "right");
   };
 
   // --------------------------------------------------------------------------
@@ -2177,15 +2187,10 @@ const setCustomParams = () => {
     const param = visibleParamsInStatus[index];
     this.changeTextColor(ColorManager.systemColor());
     // パラメータ名描画
-    this.drawText(
-      (param.nameId === undefined ? param.name : TextManager.param(param.nameId)) + (param.isRate ? " [%]" : ""),
-      rect.x,
-      rect.y,
-      160,
-    );
+    this.drawText(param.nameId === undefined ? param.name : TextManager.param(param.nameId), rect.x, rect.y, 160);
     // パラメータ値描画
-    const value = this._actor[param.type](param.paramId);
+    const value = param.key === "crd" ? this._actor.crd() : this._actor[param.type](param.paramId);
     this.resetTextColor();
-    this.drawText(param.isRate ? Math.round(value * 100) : value, rect.x + 160, rect.y, 60, "right");
+    this.drawText(param.isRate ? `${Math.round(value * 100)} %` : value, rect.x + 160, rect.y, 60, "right");
   };
 })();

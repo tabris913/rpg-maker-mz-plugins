@@ -440,7 +440,6 @@ TAW.readParams = (script) => {
       this.drawText("Q/W(L/R):ページ切替", 0, 0, this.contentsWidth(), "right");
     }
 
-    // TODO 確率能力値は%表示
     // TODO 名前と数値はもう少し離したほうがよさそう？
     drawStatusPage() {
       const target = this._battler;
@@ -484,6 +483,15 @@ TAW.readParams = (script) => {
               currentVal = target.cparam(param.paramId);
               buffLevel = target.customBuff(param.paramId);
               break;
+            case "":
+              baseVal = (target.crdBasePlus() * target.crdRate()).clamp(0, Infinity);
+              currentVal = target.crd();
+              buffLevel = target._crdBuff;
+              break;
+          }
+          if (param.isRate) {
+            baseVal = `${Math.round(baseVal * 100)} %`;
+            currentVal = `${Math.round(currentVal * 100)} %`;
           }
         } else {
           paramName = TextManager.param(i);
@@ -512,7 +520,6 @@ TAW.readParams = (script) => {
       }
     }
 
-    // TODO 確率能力値は%表示
     // TODO 名前と数値はもう少し離したほうがよさそう？
     drawEnemyStatusPage() {
       const target = this._battler;
@@ -529,8 +536,14 @@ TAW.readParams = (script) => {
         this.drawText(TextManager.basic(4), x, y, 60);
         this.resetTextColor();
         this.drawText(`${target.mp} / ${target.mmp}`, x + 70, y, 200);
-        y += this.lineHeight() + 10;
+      } else {
+        this.changeTextColor(ColorManager.systemColor());
+        this.drawText("【与えたダメージ】", x, y, this.contentsWidth());
+        y += this.lineHeight();
+        this.resetTextColor();
+        this.drawText(`HP: ${target.mhp - target.hp}`, x + 10, y, this.contentsWidth());
       }
+      y += this.lineHeight() + 10;
 
       if (TAW.showEnemyParamChange) {
         this.changeTextColor(ColorManager.systemColor());
@@ -571,6 +584,15 @@ TAW.readParams = (script) => {
                 currentVal = target.cparam(param.paramId);
                 buffLevel = target.customBuff(param.paramId);
                 break;
+              case "":
+                baseVal = (target.crdBasePlus() * target.crdRate()).clamp(0, Infinity);
+                currentVal = target.crd();
+                buffLevel = target._crdBuff;
+                break;
+            }
+            if (param.isRate) {
+              baseVal = `${Math.round(baseVal * 100)} %`;
+              currentVal = `${Math.round(currentVal * 100)} %`;
             }
           } else {
             paramName = TextManager.param(i);
@@ -625,6 +647,9 @@ TAW.readParams = (script) => {
               case "cparam":
                 buffLevel = target.customBuff(param.paramId);
                 break;
+              case "":
+                buffLevel = target._crdBuff;
+                break;
             }
           } else {
             paramName = TextManager.param(i);
@@ -650,13 +675,6 @@ TAW.readParams = (script) => {
           y += this.lineHeight();
         }
       }
-
-      y += 10;
-      this.changeTextColor(ColorManager.systemColor());
-      this.drawText("【与えたダメージ】", x, y, this.contentsWidth());
-      y += this.lineHeight();
-      this.resetTextColor();
-      this.drawText(`HP: ${target.mhp - target.hp}`, x + 10, y, this.contentsWidth());
     }
 
     // TODO 部位の名前を先頭につける
