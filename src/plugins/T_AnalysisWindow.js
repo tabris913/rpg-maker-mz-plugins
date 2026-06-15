@@ -336,7 +336,6 @@ TAW.readParams = (script) => {
   // ----------------------------------------------------------------------------
   // Window_BattleAnalysis
   // ----------------------------------------------------------------------------
-  // TODO スクロールできないのでできるようにする
   class Window_BattleAnalysis extends Window_Selectable {
     /**
      * @param {Rectangle} rect
@@ -345,6 +344,7 @@ TAW.readParams = (script) => {
       super.initialize(rect);
       this._battler = null;
       this._pageIndex = 0;
+      this._contentHeight = 0;
       this.openness = 0;
       this.deactivate();
     }
@@ -359,7 +359,13 @@ TAW.readParams = (script) => {
     set battler(battler) {
       this._battler = battler;
       this._pageIndex = 0;
+      this.scrollTo(0, 0);
       this.refresh();
+    }
+
+    // スクロール対応: コンテンツ全体の高さを返す
+    overallHeight() {
+      return Math.max(this._contentHeight, this.innerHeight);
     }
 
     // カーソル表示を無効化する
@@ -371,6 +377,9 @@ TAW.readParams = (script) => {
     onTouch() {}
 
     refresh() {
+      // まず高さを計算するためにダミー描画
+      this._contentHeight = this.calcContentHeight();
+      this.contents.resize(this.contentsWidth(), this.overallHeight());
       this.contents.clear();
       if (!this._battler) return;
 
@@ -400,15 +409,86 @@ TAW.readParams = (script) => {
       }
     }
 
-    // 左右キーでページ切り替えを行う
-    // TODO Q/W/L,Rでページ移動できないからできるように
+    /**
+     * コンテンツの高さを事前計算する
+     * @returns {number}
+     */
+    calcContentHeight() {
+      if (!this._battler) return this.innerHeight;
+
+      if (this._battler.isActor()) {
+        switch (this._pageIndex) {
+          case 0: {
+            const count = TAW.isEnableTCP ? TCP.paramsDef.length : 8;
+            return this.lineHeight() + count * this.lineHeight() + this.lineHeight();
+          }
+          case 1: {
+            const equips = this._battler.equips();
+            return this.lineHeight() + equips.length * this.lineHeight() + this.lineHeight();
+          }
+          case 2:
+            return this.calcResistPageHeight();
+        }
+      } else {
+        switch (this._pageIndex) {
+          case 0:
+            return this.calcEnemyStatusPageHeight();
+          case 1:
+            return this.calcResistPageHeight();
+        }
+      }
+      return this.innerHeight;
+    }
+
+    calcEnemyStatusPageHeight() {
+      let lines = 1; // header
+      if (TAW.showEnemyHpMp) {
+        lines += 2;
+      } else {
+        lines += 2;
+      }
+      lines += 1; // spacing
+
+      if (TAW.showEnemyParamChange) {
+        lines += 1; // section header
+        const count = TAW.isEnableTCP ? TCP.paramsDef.length : 8;
+        lines += count;
+        lines += 1; // spacing
+      }
+
+      if (!TAW.showEnemyParamChange) {
+        lines += 1; // section header
+        const count = TAW.isEnableTCP ? TCP.paramsDef.length : 8;
+        // worst case: all have buffs
+        lines += count;
+      }
+      return (lines + 2) * this.lineHeight();
+    }
+
+    calcResistPageHeight() {
+      let lines = 3; // header + line + states header
+      const states = this._battler.states();
+      lines += Math.max(1, Math.ceil(states.length / Math.floor(this.contentsWidth() / 200)));
+      lines += 1; // spacing
+      if (typeof TERS !== "undefined") {
+        lines += 1; // element header
+        lines += $dataSystem.elements.length;
+      }
+      return (lines + 2) * this.lineHeight();
+    }
+
+    // 上下キーでスクロール、左右キー/Q/W/L/Rでページ切り替えを行う
     update() {
       super.update();
       if (this.active) {
-        if (Input.isRepeated("right")) {
+        if (Input.isRepeated("right") || Input.isTriggered("pagedown")) {
           this.changePage(1);
-        } else if (Input.isRepeated("left")) {
+        } else if (Input.isRepeated("left") || Input.isTriggered("pageup")) {
           this.changePage(-1);
+        } else if (Input.isRepeated("down")) {
+          this.smoothScrollDown(1);
+        } else if (Input.isRepeated("up")) {
+          this.smoothScrollUp(1);
         }
       }
     }
@@ -419,6 +499,7 @@ TAW.readParams = (script) => {
     changePage(delta) {
       const pageCount = this._battler.isActor() ? 3 : 2;
       this._pageIndex = (this._pageIndex + delta + pageCount) % pageCount;
+      this.scrollTo(0, 0);
       SoundManager.playCursor();
       this.refresh();
     }
@@ -440,7 +521,6 @@ TAW.readParams = (script) => {
       this.drawText("Q/W(L/R):ページ切替", 0, 0, this.contentsWidth(), "right");
     }
 
-    // TODO 名前と数値はもう少し離したほうがよさそう？
     drawStatusPage() {
       const target = this._battler;
       const x = this.itemPadding();
@@ -520,7 +600,6 @@ TAW.readParams = (script) => {
       }
     }
 
-    // TODO 名前と数値はもう少し離したほうがよさそう？
     drawEnemyStatusPage() {
       const target = this._battler;
       const x = this.itemPadding();
@@ -677,18 +756,22 @@ TAW.readParams = (script) => {
       }
     }
 
-    // TODO 部位の名前を先頭につける
     drawEquipPage() {
       const target = this._battler;
       if (!target.isActor()) return;
 
       const equips = target.equips();
+      const slots = target.equipSlots();
       let y = this.lineHeight();
       const x = this.itemPadding();
 
-      equips.forEach((item) => {
+      equips.forEach((item, index) => {
+        const slotName = $dataSystem.equipTypes[slots[index]] || "";
+        this.changeTextColor(ColorManager.systemColor());
+        this.drawText(slotName, x, y, 100);
+        this.resetTextColor();
         if (item) {
-          this.drawItemName(item, x, y, this.contentsWidth() - x * 2);
+          this.drawItemName(item, x + 110, y, this.contentsWidth() - x * 2 - 110);
           let bonusDesc = "";
           for (let i = 0; i < 8; i++) {
             const p = item.params[i];
@@ -701,7 +784,7 @@ TAW.readParams = (script) => {
           this.contents.fontSize = $gameSystem.mainFontSize();
         } else {
           this.changePaintOpacity(false);
-          this.drawText("（未装備）", x + ImageManager.iconWidth + 4, y, this.contentsWidth());
+          this.drawText("（未装備）", x + 110 + ImageManager.iconWidth + 4, y, this.contentsWidth());
           this.changePaintOpacity(true);
         }
         y += this.lineHeight();
